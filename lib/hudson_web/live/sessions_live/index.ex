@@ -222,12 +222,12 @@ defmodule HudsonWeb.SessionsLive.Index do
     path = case view do
       "host" -> ~p"/sessions/#{session_id}/host"
       "producer" -> ~p"/sessions/#{session_id}/producer"
-      _ -> ~p"/sessions/#{session_id}/run"  # Backwards compatibility
+      _ -> ~p"/sessions/#{session_id}/producer"  # Default to producer
     end
     {:noreply, push_navigate(socket, to: path)}
   end
 
-  # Backwards compatibility - if no view specified, go to producer
+  # Default to producer view if no view specified
   @impl true
   def handle_event("enter_session", %{"session-id" => session_id}, socket) do
     session_id = normalize_id(session_id)

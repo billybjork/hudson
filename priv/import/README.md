@@ -147,7 +147,7 @@ mix run priv/import/create_session.exs "Extended Stream" extended \
 mix phx.server
 
 # Open session
-open http://localhost:4000/sessions/2/run
+open http://localhost:4000/sessions/2/producer
 ```
 
 **Keyboard shortcuts:**
@@ -213,7 +213,7 @@ To add more images to existing products:
 ### Session Issues
 
 **"Session not found"**
-- Check session ID in URL: `/sessions/2/run`
+- Check session ID in URL: `/sessions/2/producer` or `/sessions/2/host`
 - List sessions: `Hudson.Sessions.list_sessions() |> Hudson.Repo.all()`
 
 **Images show as 404**
@@ -247,7 +247,8 @@ Supabase Storage (full + thumbnails)
     ↓ (create_session.exs)
 Session + SessionProducts + SessionState
     ↓ (mix phx.server)
-Live Session View @ /sessions/:id/run
+Host View @ /sessions/:id/host
+Producer Console @ /sessions/:id/producer
 ```
 
 ---
@@ -311,7 +312,7 @@ mix run priv/import/create_session.exs "BFCM Heroes 2024" bfcm-2024
 
 # 6. Start server and test
 mix phx.server
-open http://localhost:4000/sessions/2/run
+open http://localhost:4000/sessions/2/producer
 
 # 7. Upload more images (optional)
 open http://localhost:4000/products/upload

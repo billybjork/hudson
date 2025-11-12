@@ -176,7 +176,7 @@ case Sessions.create_session(%{
     IO.puts("")
     IO.puts("Session ID:    #{session.id}")
     IO.puts("Products:      #{length(session_products)}")
-    IO.puts("View at:       http://localhost:4000/sessions/#{session.id}/run")
+    IO.puts("View at:       http://localhost:4000/sessions/#{session.id}/producer")
     IO.puts("")
 
   {:error, changeset} ->

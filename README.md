@@ -80,7 +80,7 @@ mix assets.build
 mix phx.server
 ```
 
-Visit: **http://localhost:4000/sessions/1/run**
+Visit: **http://localhost:4000/sessions/1/producer**
 
 ## Keyboard Controls
 

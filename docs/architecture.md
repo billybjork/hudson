@@ -116,7 +116,7 @@
 ### 2.2 Data Flow: Producer Jumps to Product
 
 ```
-Producer Browser → keyboard input (number + Enter) → SessionRunLive
+Producer Browser → keyboard input (number + Enter) → SessionProducerLive
   ↓
 Sessions.jump_to_product(session_id, position)
   ↓
@@ -124,7 +124,7 @@ Update session_states table + Broadcast PubSub
   ↓
 All subscribed LiveViews receive {:state_changed, new_state}
   ↓
-Re-render with new product
+SessionProducerLive and SessionHostLive re-render with new product
 
 Note: Arrow keys (next/previous) also supported for convenience,
 but direct jumps are the primary navigation method.
@@ -242,10 +242,6 @@ _See [Implementation Guide](implementation_guide.md#import) for CSV import detai
   - PubSub sync for real-time state management
   - Memory-optimized with temporary assigns
 
-**SessionRunLive** - Legacy Combined View (Backwards Compatibility)
-- Route: `/sessions/:id/run`
-- Purpose: Original combined view (maintained for compatibility)
-- Note: Consider migrating to separate host/producer routes
 
 **SessionEditLive** - Session Builder
 - Route: `/sessions/:id/edit`

@@ -11,7 +11,7 @@ This guide tracks implementation progress and provides instructions for remainin
 - [x] **Dependencies** - supabase_potion, earmark, bcrypt_elixir, castore
 - [x] **Domain Model** - All schemas and migrations (brands, products, product_images, sessions, session_products, session_states)
 - [x] **Contexts** - Catalog and Sessions contexts with CRUD operations
-- [x] **SessionRunLive** - Core LiveView with real-time state sync
+- [x] **SessionHostLive & SessionProducerLive** - Separated views with real-time state sync
 - [x] **Template** - Dark theme UI optimized for live streaming (3-foot viewing distance)
 - [x] **Keyboard Navigation** - JS hooks for hands-free control (direct jump + arrow keys)
 - [x] **State Management** - PubSub broadcasting, URL persistence, temporary assigns
@@ -519,8 +519,8 @@ end
 ### 5.2 LiveView Tests
 
 ```elixir
-# test/hudson_web/live/session_run_live_test.exs
-defmodule HudsonWeb.SessionRunLiveTest do
+# test/hudson_web/live/session_producer_live_test.exs
+defmodule HudsonWeb.SessionProducerLiveTest do
   use HudsonWeb.ConnCase
   import Phoenix.LiveViewTest
 
@@ -528,7 +528,7 @@ defmodule HudsonWeb.SessionRunLiveTest do
     session = insert(:session)
     sp1 = insert(:session_product, session: session, position: 1)
 
-    {:ok, view, html} = live(conn, ~p"/sessions/#{session}/run")
+    {:ok, view, html} = live(conn, ~p"/sessions/#{session}/producer")
 
     assert html =~ session.name
     assert has_element?(view, "#product-img-#{sp1.product_id}-0")
@@ -767,7 +767,7 @@ When you're ready to continue development:
 **Ready for use:**
 ```bash
 mix phx.server
-# Visit: http://localhost:4000/sessions/2/run
+# Visit: http://localhost:4000/sessions/2/producer
 ```
 
 **Next priorities:**

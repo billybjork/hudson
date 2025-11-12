@@ -234,13 +234,13 @@ Adding products to session...
 
 Session ID:    2
 Products:      18
-View at:       http://localhost:4000/sessions/2/run
+View at:       http://localhost:4000/sessions/2/producer
 ```
 
 ### 4. Stream!
 ```bash
 mix phx.server
-open http://localhost:4000/sessions/2/run
+open http://localhost:4000/sessions/2/producer
 ```
 
 ---
