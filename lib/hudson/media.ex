@@ -28,7 +28,7 @@ defmodule Hudson.Media do
            content_type: "image/jpeg",
            upsert: true
          }) do
-      {:ok, _response} ->
+      {:ok, _result} ->
         # Generate and upload thumbnail
         case generate_and_upload_thumbnail(storage, file_path, product_id, position) do
           {:ok, thumb_path} ->
@@ -36,13 +36,12 @@ defmodule Hudson.Media do
 
           {:error, reason} ->
             Logger.warning("Thumbnail generation failed: #{inspect(reason)}, using full image")
-            # If thumbnail fails, use full image as fallback
             {:ok, %{path: full_path, thumbnail_path: full_path}}
         end
 
       {:error, error} ->
         Logger.error("Upload failed: #{inspect(error)}")
-        {:error, "Upload failed: #{error.message}"}
+        {:error, "Upload failed: #{inspect(error)}"}
     end
   end
 
@@ -70,7 +69,7 @@ defmodule Hudson.Media do
                content_type: "image/jpeg",
                upsert: true
              }) do
-          {:ok, _response} ->
+          {:ok, _result} ->
             File.rm(thumb_tmp)
             {:ok, thumb_path}
 

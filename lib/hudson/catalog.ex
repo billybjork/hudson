@@ -70,6 +70,21 @@ defmodule Hudson.Catalog do
     |> Repo.all()
   end
 
+  @doc """
+  Lists all products with their images preloaded, ordered by display_number.
+  Adds a primary_image virtual field for convenience.
+  """
+  def list_products_with_images do
+    Product
+    |> order_by([p], asc: p.display_number)
+    |> preload(:product_images)
+    |> Repo.all()
+    |> Enum.map(fn product ->
+      primary_image = Enum.find(product.product_images, & &1.is_primary) || List.first(product.product_images)
+      Map.put(product, :primary_image, primary_image)
+    end)
+  end
+
   defp apply_product_filters(query, []), do: query
 
   defp apply_product_filters(query, [{:brand_id, brand_id} | rest]) do

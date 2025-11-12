@@ -58,17 +58,21 @@ defmodule HudsonWeb.ProductUploadLive do
             case Media.upload_product_image(path, product_id, position) do
               {:ok, %{path: img_path, thumbnail_path: thumb_path}} ->
                 # Create product_image record
-                {:ok, product_image} =
-                  Catalog.create_product_image(%{
-                    product_id: product_id,
-                    path: img_path,
-                    thumbnail_path: thumb_path,
-                    position: position,
-                    is_primary: position == 0,
-                    alt_text: "#{entry.client_name}"
-                  })
+                case Catalog.create_product_image(%{
+                       product_id: product_id,
+                       path: img_path,
+                       thumbnail_path: thumb_path,
+                       position: position,
+                       is_primary: position == 0,
+                       alt_text: "#{entry.client_name}"
+                     }) do
+                  {:ok, product_image} ->
+                    {:ok, %{success: true, filename: entry.client_name, image: product_image}}
 
-                {:ok, %{success: true, filename: entry.client_name, image: product_image}}
+                  {:error, _changeset} ->
+                    {:postpone,
+                     %{success: false, filename: entry.client_name, error: "Failed to create DB record"}}
+                end
 
               {:error, reason} ->
                 {:postpone, %{success: false, filename: entry.client_name, error: reason}}

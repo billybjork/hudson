@@ -220,16 +220,20 @@ defmodule Hudson.Import do
     if File.exists?(image_file_path) do
       case Media.upload_product_image(image_file_path, product.id, position) do
         {:ok, %{path: path, thumbnail_path: thumb_path}} ->
-          Catalog.create_product_image(%{
+          case Catalog.create_product_image(%{
             product_id: product.id,
             path: path,
             thumbnail_path: thumb_path,
             position: position,
             is_primary: position == 0,
             alt_text: "#{product.name} - Image #{position + 1}"
-          })
+          }) do
+            {:ok, _image} ->
+              Logger.info("Uploaded image for product #{product.display_number}: #{filename}")
 
-          Logger.info("Uploaded image for product #{product.display_number}: #{filename}")
+            {:error, changeset} ->
+              Logger.error("Failed to create product_image record for product #{product.display_number}: #{inspect(changeset.errors)}")
+          end
 
         {:error, reason} ->
           Logger.error("Failed to upload image for product #{product.display_number}: #{inspect(reason)}")

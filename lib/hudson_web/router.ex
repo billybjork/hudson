@@ -19,11 +19,12 @@ defmodule HudsonWeb.Router do
 
     get "/", PageController, :home
 
+    # Product management
+    live "/products", ProductsLive.Index
+    live "/products/upload", ProductUploadLive
+
     # Session management and live control
     live "/sessions/:id/run", SessionRunLive
-
-    # Product image upload
-    live "/products/upload", ProductUploadLive
   end
 
   # Other scopes may use custom stacks.

@@ -120,7 +120,7 @@ IO.puts("")
 start_time = System.monotonic_time(:millisecond)
 
 case Import.import_from_folder(folder_path, opts) do
-  {:ok, %{preview: preview}} ->
+  {:ok, preview: preview} ->
     # Dry run results
     IO.puts("Preview Results:")
     IO.puts("────────────────────────────────────────────")

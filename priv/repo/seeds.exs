@@ -1,251 +1,374 @@
-# Script for populating the database with sample data for Hudson
-# Run with: mix run priv/repo/seeds.exs
+# Seeds for Hudson - Sample Product Data
+# Run: mix run priv/repo/seeds.exs
 
-alias Hudson.{Repo, Catalog, Sessions}
+alias Hudson.{Repo, Catalog, Media}
 alias Hudson.Catalog.{Brand, Product, ProductImage}
+
+require Logger
+
+IO.puts("""
+╔═══════════════════════════════════════════╗
+║     Hudson Database Seeding               ║
+╚═══════════════════════════════════════════╝
+""")
+
+# Step 1: Clear existing data
+IO.puts("Step 1: Clearing existing data...")
+
+# Import Sessions module for clearing session data
 alias Hudson.Sessions.{Session, SessionProduct, SessionState}
 
-# Clean existing data (be careful in production!)
-IO.puts("Cleaning existing data...")
 Repo.delete_all(SessionState)
 Repo.delete_all(SessionProduct)
 Repo.delete_all(Session)
 Repo.delete_all(ProductImage)
 Repo.delete_all(Product)
-Repo.delete_all(Brand)
+IO.puts("  ✓ Cleared sessions, products, and images")
 
-IO.puts("Creating brand...")
+# Step 2: Ensure brand exists
+IO.puts("\nStep 2: Ensuring brand exists...")
+brand = case Repo.get_by(Brand, slug: "pavoi") do
+  nil ->
+    {:ok, brand} = Catalog.create_brand(%{
+      name: "Pavoi",
+      slug: "pavoi",
+      notes: "Premium jewelry brand"
+    })
+    IO.puts("  ✓ Created Pavoi brand")
+    brand
+  brand ->
+    IO.puts("  ✓ Found existing Pavoi brand")
+    brand
+end
 
-# Create Pavoi brand
-{:ok, pavoi} =
-  Catalog.create_brand(%{
-    name: "Pavoi",
-    slug: "pavoi",
-    notes: "Premium jewelry brand specializing in affordable luxury"
-  })
+# Step 3: Sample product data
+IO.puts("\nStep 3: Creating sample products...")
 
-IO.puts("Created brand: #{pavoi.name}")
-
-IO.puts("Creating products...")
-
-# Create sample products
-products_data = [
+sample_products = [
   %{
     display_number: 1,
-    name: "CZ Lariat Station Necklace - Gold",
+    name: "Dainty CZ Rings Bundle",
     talking_points_md: """
-    - High-quality cubic zirconia stones that sparkle like diamonds
-    - Adjustable lariat style for perfect fit
-    - Perfect for layering with other necklaces
-    - Tarnish-free 14K gold plating lasts for years
-    - Best seller - limited stock available
+    - Mila & X cross ring
+    - Available in 14K yellow gold and rhodium plating
+    - Sizing: 4-10
+    - TIKTOK EXCLUSIVE BUNDLE
     """,
-    original_price_cents: 4999,
-    sale_price_cents: 2999,
-    pid: "TT12345",
-    sku: "NECK-001",
-    stock: 150,
-    tags: ["necklace", "gold", "holiday", "bestseller"]
+    original_price_cents: 4995,
+    sale_price_cents: 3995,
+    pid: "1732025389156504072",
+    sku: "BUNDLE-001"
   },
   %{
     display_number: 2,
-    name: "Tennis Bracelet - Rose Gold",
+    name: "Heart Tennis Bracelet Set",
     talking_points_md: """
-    - Classic tennis bracelet design with modern rose gold finish
-    - 50 brilliant-cut cubic zirconia stones
-    - Secure box clasp with safety latch
-    - Hypoallergenic - safe for sensitive skin
-    - Perfect gift for any occasion
+    - Heart Tennis Bracelet and Matching Heart Bezel Eternity Ring
+    - 4mm heart-cut stones with 5mm band
+    - Available in gold and white gold
+    - Sizes 5-9
     """,
-    original_price_cents: 5999,
-    sale_price_cents: 3499,
-    pid: "TT12346",
-    sku: "BRAC-001",
-    stock: 85,
-    tags: ["bracelet", "rose-gold", "tennis", "gift"]
+    original_price_cents: 4500,
+    sale_price_cents: 3600,
+    pid: "1732025453170823688",
+    sku: "BUNDLE-002"
   },
   %{
     display_number: 3,
-    name: "Huggie Hoop Earrings - Silver",
+    name: "U Shaped & Paperclip Necklaces",
     talking_points_md: """
-    - Small huggie hoops perfect for everyday wear
-    - 925 sterling silver - authentic quality
-    - Comfortable lightweight design
-    - Secure click closure
-    - Great for stacking with other earrings
+    - U-shaped: 18" + 3" extender, 8mm wide
+    - Paperclip: 11mm x 3.9mm links
+    - Layering bundle
     """,
-    original_price_cents: 3499,
-    sale_price_cents: 1999,
-    pid: "TT12347",
-    sku: "EAR-001",
-    stock: 200,
-    tags: ["earrings", "silver", "hoops", "everyday"]
+    original_price_cents: 4715,
+    pid: "1732025444076851720",
+    sku: "BUNDLE-003"
   },
   %{
     display_number: 4,
-    name: "Infinity Symbol Ring - White Gold",
+    name: "Interlocked Two Toned Ring",
     talking_points_md: """
-    - Beautiful infinity symbol represents eternal love
-    - Elegant white gold finish
-    - Comfortable band width
-    - Available in sizes 5-10
-    - Makes a meaningful gift
+    - #1 best seller in women's band rings
+    - Mixed metal design - very hot right now
+    - Each band is 2mm wide
+    - 100% nickel-free, hypoallergenic
+    - 4.6 star rating on TikTok Shop
     """,
-    original_price_cents: 3999,
-    sale_price_cents: 2499,
-    pid: "TT12348",
-    sku: "RING-001",
-    stock: 120,
-    tags: ["ring", "white-gold", "infinity", "symbolic"]
+    original_price_cents: 1745,
+    sale_price_cents: 1396,
+    pid: "1730896012450828808",
+    sku: "TA7"
   },
   %{
     display_number: 5,
-    name: "Pearl Drop Earrings - Gold",
+    name: "Pear Wavy Engagement Ring",
     talking_points_md: """
-    - Freshwater pearl drops with 14K gold posts
-    - Classic elegant style
-    - Perfect for formal occasions
-    - Lightweight and comfortable
-    - Comes with storage pouch
+    - 7mm x 10mm pear cut
+    - Around 2CT equivalent
+    - Wavy band design
+    - Sizes 5-9
     """,
-    original_price_cents: 4499,
-    sale_price_cents: 2799,
-    pid: "TT12349",
-    sku: "EAR-002",
-    stock: 95,
-    tags: ["earrings", "pearl", "gold", "formal"]
+    original_price_cents: 5995,
+    sale_price_cents: 4796,
+    pid: "1730592865399575048",
+    sku: "2311-R06"
   },
   %{
     display_number: 6,
-    name: "Chain Link Bracelet - Gold",
+    name: "Oval Eternity Band",
     talking_points_md: """
-    - Bold chain link design
-    - 18K gold vermeil finish
-    - Adjustable length 7-8 inches
-    - Statement piece that stands out
-    - Trending style right now
+    - 5A Quality Gem Grade Cubic Zirconia
+    - 5mm oval stones, 5mm band width
+    - 14K Gold plated, hypoallergenic
+    - Great for stacking or travel
     """,
-    original_price_cents: 5499,
-    sale_price_cents: 3299,
-    pid: "TT12350",
-    sku: "BRAC-002",
-    stock: 65,
-    tags: ["bracelet", "gold", "chain", "trending"]
+    original_price_cents: 1595,
+    sale_price_cents: 1276,
+    pid: "1729554653838283272",
+    sku: "TTK20C-R03"
   },
   %{
     display_number: 7,
-    name: "Stud Earrings Set - Mixed Metals",
+    name: "Milgrain Eternity Band",
     talking_points_md: """
-    - Set of 3 pairs in gold, silver, and rose gold
-    - Perfect for everyday mixing and matching
-    - Secure butterfly backs
-    - Hypoallergenic posts
-    - Amazing value - 3 pairs for the price of 1
+    - Classic milgrain detailing
+    - 5A CZ stones
+    - Sizes 5-10
     """,
-    original_price_cents: 2999,
-    sale_price_cents: 1999,
-    pid: "TT12351",
-    sku: "EAR-003",
-    stock: 175,
-    tags: ["earrings", "set", "mixed-metals", "value"]
+    original_price_cents: 1895,
+    pid: "1731178897612313096",
+    sku: "19B-TC20-Y6"
   },
   %{
     display_number: 8,
-    name: "Pendant Necklace - Heart Design",
+    name: "Religious Cross Ring",
     talking_points_md: """
-    - Delicate heart pendant with CZ accent
-    - 16-18 inch adjustable chain
-    - Perfect for Valentine's Day or anniversaries
-    - Comes in beautiful gift box
-    - Made to last a lifetime
+    - Delicate cross design
+    - Available in gold and silver
+    - Sizes 5-10
     """,
-    original_price_cents: 3999,
-    sale_price_cents: 2499,
-    pid: "TT12352",
-    sku: "NECK-002",
-    stock: 110,
-    tags: ["necklace", "heart", "pendant", "romantic"]
+    original_price_cents: 1495,
+    sale_price_cents: 1196,
+    pid: "1731823202067780104",
+    sku: "2209-R01"
+  },
+  %{
+    display_number: 9,
+    name: "CZ Cross Pendant Necklace",
+    talking_points_md: """
+    - 14K gold plated
+    - 19" sliding chain for adjustable fit
+    - Perfect for layering
+    """,
+    original_price_cents: 1295,
+    pid: "1729738235916161544",
+    sku: "19B-TC08"
+  },
+  %{
+    display_number: 10,
+    name: "Station Necklace",
+    talking_points_md: """
+    - 15" + 3" extender
+    - 1.3mm delicate chain
+    - 5A CZ stations
+    """,
+    original_price_cents: 1495,
+    sale_price_cents: 1196,
+    pid: "1729555020284072456",
+    sku: "21A-N11"
+  },
+  %{
+    display_number: 11,
+    name: "Dainty Crystal Solitaire Necklace",
+    talking_points_md: """
+    - 1.5 Carat (7.3mm) CZ crystal
+    - 18" with 2" extender
+    - 14K gold-plated setting
+    - 4.7 star rating on TikTok
+    - 4.4 stars on Amazon (17,000+ reviews)
+    """,
+    original_price_cents: 1345,
+    pid: "1729555020825465352",
+    sku: "19B-TC06"
+  },
+  %{
+    display_number: 12,
+    name: "Station CZ Hand Bracelet",
+    talking_points_md: """
+    - Ring portion: 4.2", chain: 3", bracelet: 6" + 2" extender
+    - 14K gold and rhodium plated
+    - 2.5mm premium AAAAA Cubic Zirconia
+    """,
+    original_price_cents: 1395,
+    sale_price_cents: 1116,
+    pid: "1729560045457412616",
+    sku: "TKT2401-HC01-V2"
+  },
+  %{
+    display_number: 13,
+    name: "Tennis Bracelet",
+    talking_points_md: """
+    - Round 3mm CZ stones in four-prong settings
+    - 5A CZ premium quality
+    - 14K gold plated
+    - Sizes: 6.5", 7", 7.5"
+    - Lead-free and hypoallergenic
+    """,
+    original_price_cents: 1795,
+    sale_price_cents: 1436,
+    pid: "1729554646471512584",
+    sku: "TKT19B-TC16"
+  },
+  %{
+    display_number: 14,
+    name: "Emerald Cut Tennis Bracelet",
+    talking_points_md: """
+    - 3mm x 4mm emerald-cut stones
+    - Bezel setting for modern look
+    - Sizes 6" - 7.5"
+    """,
+    original_price_cents: 2195,
+    pid: "1731392948627280392",
+    sku: "2406-B05"
+  },
+  %{
+    display_number: 15,
+    name: "Love Bangle",
+    talking_points_md: """
+    - 2.7mm premium CZ stones
+    - 6mm wide bangle
+    - Stainless steel construction
+    - Inner diameter: 50mm x 60mm (size 7)
+    """,
+    original_price_cents: 3295,
+    sale_price_cents: 2636,
+    pid: "1731817833983414792",
+    sku: "BANGLE-001"
+  },
+  %{
+    display_number: 16,
+    name: "Heart Charms Bracelet Set",
+    talking_points_md: """
+    - Two 9" bracelets included
+    - Small heart: 8mm x 6.8mm
+    - Open heart: 11.8mm x 10mm
+    - Went viral for mother/daughter matching
+    """,
+    original_price_cents: 2495,
+    pid: "1730595722208973320",
+    sku: "2311-R05"
+  },
+  %{
+    display_number: 17,
+    name: "Oval Pull-Through Earrings",
+    talking_points_md: """
+    - Statement earrings: 24mm x 18mm
+    - 9mm opening for easy wear
+    - Sterling silver posts
+    """,
+    original_price_cents: 1895,
+    sale_price_cents: 1516,
+    pid: "1730928918542848520",
+    sku: "2305-E04-Yv2"
+  },
+  %{
+    display_number: 18,
+    name: "CZ Huggie Earrings Set",
+    talking_points_md: """
+    - Set of 3 sizes: 8mm, 10mm, 12mm
+    - 18K Gold Plated
+    - 925 Sterling Silver Posts
+    - Hinged closure for security
+    """,
+    original_price_cents: 1845,
+    sale_price_cents: 1476,
+    pid: "1730568297058439688",
+    sku: "22D-EP01"
   }
 ]
 
-products =
-  Enum.map(products_data, fn product_attrs ->
-    attrs = Map.put(product_attrs, :brand_id, pavoi.id)
-    {:ok, product} = Catalog.create_product(attrs)
+# Create products
+products = Enum.map(sample_products, fn attrs ->
+  {:ok, product} = Catalog.create_product(Map.put(attrs, :brand_id, brand.id))
+  IO.puts("  ✓ Created product ##{product.display_number}: #{product.name}")
+  product
+end)
 
-    # Add placeholder images for each product
-    # In real use, these would be actual Supabase storage paths
-    image_paths = [
-      "#{product.id}/image-1.jpg",
-      "#{product.id}/image-2.jpg",
-      "#{product.id}/image-3.jpg"
-    ]
+# Step 4: Generate placeholder images
+IO.puts("\nStep 4: Generating placeholder images...")
 
-    Enum.with_index(image_paths, fn path, idx ->
-      Catalog.create_product_image(%{
+# Create temp directory for placeholders
+tmp_dir = System.tmp_dir!()
+placeholder_dir = Path.join(tmp_dir, "hudson_placeholders")
+File.mkdir_p!(placeholder_dir)
+
+# Generate simple colored placeholder images for each product
+colors = [
+  "#E8D5C4", "#C9A690", "#8B7355", "#D4AF37", "#FFD700",
+  "#C0C0C0", "#E5E4E2", "#F0E68C", "#DDA0DD", "#B0C4DE",
+  "#F4A460", "#BC8F8F", "#D2B48C", "#F5DEB3", "#FFDAB9",
+  "#E6E6FA", "#D8BFD8", "#DDA0DD"
+]
+
+Enum.each(products, fn product ->
+  color = Enum.at(colors, rem(product.display_number - 1, length(colors)))
+  placeholder_path = Path.join(placeholder_dir, "product_#{product.id}.jpg")
+
+  # Generate a simple colored square with product number
+  {_output, 0} = System.cmd("magick", [
+    "-size", "800x800",
+    "xc:#{color}",
+    "-pointsize", "120",
+    "-fill", "white",
+    "-gravity", "center",
+    "-annotate", "+0+0", "#{product.display_number}",
+    "-quality", "90",
+    placeholder_path
+  ])
+
+  # Upload to Supabase
+  case Media.upload_product_image(placeholder_path, product.id, 0) do
+    {:ok, %{path: path, thumbnail_path: thumb_path}} ->
+      {:ok, _} = Catalog.create_product_image(%{
         product_id: product.id,
         path: path,
-        position: idx,
-        is_primary: idx == 0,
-        alt_text: "#{product.name} - View #{idx + 1}"
+        thumbnail_path: thumb_path,
+        position: 0,
+        is_primary: true,
+        alt_text: "#{product.name}"
       })
-    end)
+      IO.puts("  ✓ Generated image for product ##{product.display_number}")
 
-    IO.puts("Created product #{product.display_number}: #{product.name}")
-    product
-  end)
+    {:error, reason} ->
+      IO.puts("  ✗ Failed to upload image for product ##{product.display_number}: #{inspect(reason)}")
+  end
 
-IO.puts("Creating session...")
+  # Clean up temp file
+  File.rm(placeholder_path)
+end)
 
-# Create a sample session
-{:ok, session} =
-  Sessions.create_session(%{
-    brand_id: pavoi.id,
-    name: "Holiday Favorites - December 2024",
-    slug: "holiday-favorites-dec-2024",
-    scheduled_at: ~N[2024-12-15 18:00:00],
-    duration_minutes: 180,
-    status: "draft",
-    notes: "Holiday season kickoff stream"
-  })
+# Clean up temp directory
+File.rm_rf!(placeholder_dir)
 
-IO.puts("Created session: #{session.name}")
+IO.puts("""
 
-IO.puts("Adding products to session...")
+╔═══════════════════════════════════════════╗
+║     Seeding Complete!                     ║
+╚═══════════════════════════════════════════╝
 
-# Add all products to the session
-session_products =
-  products
-  |> Enum.with_index(1)
-  |> Enum.map(fn {product, position} ->
-    {:ok, sp} =
-      Sessions.add_product_to_session(session.id, product.id, %{
-        position: position
-      })
+Created:
+  • #{length(products)} products
+  • #{length(products)} placeholder images
+  • All uploaded to Supabase
 
-    IO.puts("  Added product #{position}: #{product.name}")
-    sp
-  end)
+Next steps:
+  1. Start the server:
+     mix phx.server
 
-IO.puts("Initializing session state...")
+  2. View products:
+     http://localhost:4000/products
 
-# Initialize session state to first product
-first_sp = List.first(session_products)
-
-{:ok, _state} =
-  Repo.insert(%SessionState{
-    session_id: session.id,
-    current_session_product_id: first_sp.id,
-    current_image_index: 0,
-    updated_at: DateTime.utc_now() |> DateTime.truncate(:second)
-  })
-
-IO.puts("\n✅ Seed data created successfully!")
-IO.puts("\nYou can now:")
-IO.puts("  1. Start the server: mix phx.server")
-IO.puts("  2. Visit the session: http://localhost:4000/sessions/#{session.id}/run")
-IO.puts("\nKeyboard shortcuts:")
-IO.puts("  - Type a number (1-8) and press Enter to jump to that product")
-IO.puts("  - ↑/↓ arrows for previous/next product (convenience)")
-IO.puts("  - ←/→ arrows for previous/next image")
-IO.puts("  - Home/End for first/last product")
+  3. Create a test session:
+     mix run priv/import/create_session.exs "Sample Session" sample-session
+""")
