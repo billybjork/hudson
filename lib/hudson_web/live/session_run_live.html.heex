@@ -1,0 +1,101 @@
+<div
+  id="session-run-container"
+  class="session-container"
+  phx-hook="KeyboardControl"
+>
+  <!-- Header -->
+  <header class="session-header">
+    <div class="session-title"><%= @session.name %></div>
+    <div class="session-info">
+      <%= if @current_position do %>
+        <div class="product-count">
+          Product <%= @current_position %> / <%= @total_products %>
+        </div>
+      <% end %>
+      <div id="connection-status" phx-hook="ConnectionStatus" class="connection-status">
+        <span class="connected">● Connected</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <%= if @current_session_product && @current_product do %>
+    <div class="session-main">
+      <!-- Left: Product Image -->
+      <div class="product-image-container">
+        <%= if @product_images && length(@product_images) > 0 do %>
+          <% current_image = Enum.at(@product_images, @current_image_index) %>
+          <%= if current_image do %>
+            <div class="image-wrapper">
+              <img
+                id={"product-img-#{@current_product.id}-#{@current_image_index}"}
+                class="product-image"
+                src={public_image_url(current_image.path)}
+                alt={current_image.alt_text || @current_product.name}
+              />
+            </div>
+            <div class="image-indicator">
+              <%= @current_image_index + 1 %> / <%= length(@product_images) %>
+            </div>
+          <% end %>
+        <% else %>
+          <div class="no-images">No images available</div>
+        <% end %>
+      </div>
+
+      <!-- Right: Product Info & Talking Points -->
+      <div class="product-details">
+        <!-- Product Header -->
+        <div class="product-header">
+          <h1 class="product-name">
+            <%= get_effective_name(@current_session_product) %>
+          </h1>
+
+          <div class="product-pricing">
+            <% prices = get_effective_prices(@current_session_product) %>
+            <%= if prices.sale do %>
+              <span class="sale-price">
+                <%= format_price(prices.sale) %>
+              </span>
+              <span class="original-price">
+                <%= format_price(prices.original) %>
+              </span>
+            <% else %>
+              <span class="price">
+                <%= format_price(prices.original) %>
+              </span>
+            <% end %>
+          </div>
+
+          <div class="product-meta">
+            <%= if @current_product.pid do %>
+              <div class="meta-item">PID: <%= @current_product.pid %></div>
+            <% end %>
+            <%= if @current_product.sku do %>
+              <div class="meta-item">SKU: <%= @current_product.sku %></div>
+            <% end %>
+            <%= if @current_product.stock do %>
+              <div class="meta-item">Stock: <%= @current_product.stock %></div>
+            <% end %>
+          </div>
+        </div>
+
+        <!-- Talking Points -->
+        <div class="talking-points">
+          <%= if @talking_points_html do %>
+            <%= @talking_points_html %>
+          <% else %>
+            <p class="no-talking-points">No talking points available</p>
+          <% end %>
+        </div>
+      </div>
+    </div>
+  <% else %>
+    <div class="session-main">
+      <div class="loading-state">
+        <div class="loading-spinner"></div>
+        <p>Loading session...</p>
+      </div>
+    </div>
+  <% end %>
+</div>

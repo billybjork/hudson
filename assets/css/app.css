@@ -1,0 +1,482 @@
+/* Hudson CSS - Dark Theme for Live Streaming */
+
+/* ===== ROOT VARIABLES ===== */
+:root {
+  /* Colors */
+  --bg-dark: #1a1a1a;
+  --bg-darker: #0a0a0a;
+  --bg-medium: #2a2a2a;
+  --bg-light: #3a3a3a;
+  --text-primary: #f0f0f0;
+  --text-secondary: #999;
+  --text-muted: #666;
+  --border-color: #444;
+  --accent-gold: #ffd700;
+  --accent-green: #4ade80;
+  --accent-red: #ef4444;
+  --accent-blue: #3b82f6;
+
+  /* Spacing */
+  --spacing-xs: 0.25rem;
+  --spacing-sm: 0.5rem;
+  --spacing-md: 1rem;
+  --spacing-lg: 1.5rem;
+  --spacing-xl: 2rem;
+
+  /* Typography */
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, monospace;
+
+  /* Transitions */
+  --transition-fast: 0.15s ease;
+  --transition-medium: 0.3s ease;
+  --transition-slow: 0.5s ease;
+}
+
+/* ===== GLOBAL RESET ===== */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--text-primary);
+  background-color: var(--bg-dark);
+  overflow: hidden; /* Prevent body scroll during sessions */
+}
+
+/* ===== SESSION CONTAINER ===== */
+.session-container {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-dark);
+  color: var(--text-primary);
+}
+
+/* ===== HEADER ===== */
+.session-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--spacing-md) var(--spacing-lg);
+  background: var(--bg-medium);
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.session-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.session-info {
+  display: flex;
+  gap: var(--spacing-lg);
+  align-items: center;
+}
+
+.product-count {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+}
+
+.connection-status {
+  font-size: 0.875rem;
+}
+
+.connection-status .connected {
+  color: var(--accent-green);
+}
+
+.connection-status .reconnecting {
+  color: var(--accent-gold);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.connection-status .disconnected {
+  color: var(--accent-red);
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* ===== MAIN CONTENT ===== */
+.session-main {
+  display: flex;
+  flex: 1;
+  min-height: 0; /* Critical for flex children to respect parent height */
+}
+
+/* ===== LEFT PANEL - PRODUCT IMAGE ===== */
+.product-image-container {
+  flex: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-xl);
+  background: var(--bg-darker);
+  position: relative;
+}
+
+.image-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  max-height: 70vh;
+}
+
+.product-image {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 8px;
+  transition: opacity var(--transition-medium);
+}
+
+.image-indicator {
+  position: absolute;
+  bottom: var(--spacing-lg);
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.7);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: 20px;
+  font-size: 0.875rem;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+}
+
+.no-images {
+  color: var(--text-muted);
+  font-size: 1.5rem;
+  text-align: center;
+}
+
+/* ===== LOADING STATE ===== */
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  color: var(--text-secondary);
+}
+
+.loading-spinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid var(--bg-light);
+  border-top-color: var(--accent-gold);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin-bottom: var(--spacing-lg);
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.loading-state p {
+  font-size: 1.125rem;
+  color: var(--text-secondary);
+}
+
+/* ===== RIGHT PANEL - PRODUCT DETAILS ===== */
+.product-details {
+  flex: 2;
+  display: flex;
+  flex-direction: column;
+  padding: var(--spacing-xl);
+  overflow-y: auto;
+  background: var(--bg-dark);
+}
+
+/* Custom scrollbar */
+.product-details::-webkit-scrollbar {
+  width: 8px;
+}
+
+.product-details::-webkit-scrollbar-track {
+  background: var(--bg-medium);
+}
+
+.product-details::-webkit-scrollbar-thumb {
+  background: var(--bg-light);
+  border-radius: 4px;
+}
+
+.product-details::-webkit-scrollbar-thumb:hover {
+  background: var(--border-color);
+}
+
+/* ===== PRODUCT HEADER ===== */
+.product-header {
+  margin-bottom: var(--spacing-xl);
+}
+
+.product-name {
+  font-size: 2.25rem;
+  font-weight: 700;
+  line-height: 1.2;
+  margin-bottom: var(--spacing-md);
+  color: var(--text-primary);
+}
+
+.product-pricing {
+  display: flex;
+  gap: var(--spacing-md);
+  align-items: baseline;
+  margin-bottom: var(--spacing-md);
+}
+
+.price {
+  font-size: 1.875rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.sale-price {
+  font-size: 1.875rem;
+  font-weight: 700;
+  color: var(--accent-green);
+}
+
+.original-price {
+  font-size: 1.25rem;
+  color: var(--text-secondary);
+  text-decoration: line-through;
+}
+
+.product-meta {
+  display: flex;
+  gap: var(--spacing-lg);
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+}
+
+.meta-item {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background: var(--bg-medium);
+  border-radius: 4px;
+}
+
+/* ===== TALKING POINTS ===== */
+.talking-points {
+  font-size: 1.5rem;
+  line-height: 1.6;
+}
+
+.talking-points ul {
+  list-style: none;
+  padding-left: 0;
+}
+
+.talking-points li {
+  margin-bottom: var(--spacing-md);
+  padding-left: var(--spacing-lg);
+  position: relative;
+}
+
+.talking-points li::before {
+  content: "●";
+  position: absolute;
+  left: 0;
+  color: var(--accent-gold);
+}
+
+.talking-points p {
+  margin-bottom: var(--spacing-md);
+}
+
+.talking-points strong {
+  color: var(--accent-gold);
+  font-weight: 600;
+}
+
+.talking-points em {
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.no-talking-points {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* ===== LQIP IMAGE LOADING (Future Enhancement) ===== */
+.lqip-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.lqip-skeleton {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    90deg,
+    var(--bg-medium) 25%,
+    var(--bg-light) 50%,
+    var(--bg-medium) 75%
+  );
+  background-size: 200% 100%;
+  animation: loading 1.5s infinite;
+}
+
+@keyframes loading {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.lqip-placeholder {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  opacity: 1;
+  transition: opacity var(--transition-slow);
+  filter: blur(20px);
+  transform: scale(1.05);
+}
+
+.lqip-placeholder[data-js-placeholder-loaded="true"] {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.lqip-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: blur(20px);
+  transform: scale(1.05);
+  opacity: 0;
+  transition:
+    filter var(--transition-slow) ease-out,
+    transform var(--transition-slow) ease-out,
+    opacity var(--transition-slow) ease-out;
+}
+
+.lqip-image[data-js-loading="false"] {
+  filter: blur(0);
+  transform: scale(1);
+  opacity: 1;
+}
+
+/* ===== FLASH MESSAGES ===== */
+.flash {
+  position: fixed;
+  top: var(--spacing-lg);
+  right: var(--spacing-lg);
+  padding: var(--spacing-md) var(--spacing-lg);
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  z-index: 1000;
+  animation: slideIn 0.3s ease;
+}
+
+.flash.flash-info {
+  background: var(--accent-blue);
+  color: white;
+}
+
+.flash.flash-error {
+  background: var(--accent-red);
+  color: white;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* ===== RESPONSIVE DESIGN ===== */
+@media (max-width: 1024px) {
+  .session-main {
+    flex-direction: column;
+  }
+
+  .product-image-container {
+    flex: 1;
+    max-height: 50vh;
+  }
+
+  .product-details {
+    flex: 1;
+  }
+
+  .product-name {
+    font-size: 1.75rem;
+  }
+
+  .talking-points {
+    font-size: 1.25rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .session-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--spacing-sm);
+  }
+
+  .session-info {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .product-name {
+    font-size: 1.5rem;
+  }
+
+  .talking-points {
+    font-size: 1.125rem;
+  }
+}
+
+/* ===== UTILITY CLASSES ===== */
+.hidden {
+  display: none !important;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}

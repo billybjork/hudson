@@ -1,712 +1,180 @@
 # Implementation Guide
 
-This guide walks through implementing Hudson from scratch, including critical performance patterns, real-time synchronization, and image loading optimizations.
+This guide tracks implementation progress and provides instructions for remaining features.
 
-## 1. Project Setup
+## Implementation Status
 
-### 1.1 Create Phoenix Project
+### ✅ Completed (Core MVP)
 
-```bash
-# Create new Phoenix app with LiveView, WITHOUT Tailwind (use regular CSS)
-mix phx.new hudson --live --no-tailwind
+- [x] **Project Setup** - Phoenix 1.8 with LiveView, no Tailwind
+- [x] **Database Configuration** - Supabase support with SSL/TLS, local PostgreSQL fallback
+- [x] **Dependencies** - supabase_potion, earmark, bcrypt_elixir, castore
+- [x] **Domain Model** - All schemas and migrations (brands, products, product_images, sessions, session_products, session_states)
+- [x] **Contexts** - Catalog and Sessions contexts with CRUD operations
+- [x] **SessionRunLive** - Core LiveView with real-time state sync
+- [x] **Template** - Dark theme UI optimized for live streaming (3-foot viewing distance)
+- [x] **Keyboard Navigation** - JS hooks for hands-free control (direct jump + arrow keys)
+- [x] **State Management** - PubSub broadcasting, URL persistence, temporary assigns
+- [x] **Seed Data** - 8 sample products with talking points
 
-cd hudson
-```
+### 🚧 In Progress / Next Steps
 
-**Note:** We skip Tailwind (`--no-tailwind`) and use regular CSS for full control over styling.
+- [ ] **Supabase Storage** - Image upload with public read access (§1)
+- [ ] **LQIP Image Loading** - Thumbnail generation, smooth transitions (§2)
+- [ ] **CSV Import** - Bulk product import with validation (§3)
+- [ ] **Testing** - Context and LiveView tests (§4)
 
-### 1.2 Configure Database
+### 📦 Post-MVP Features
 
-Edit `config/dev.exs` and `config/runtime.exs` to use Supabase with strict TLS verification:
-
-```elixir
-# config/runtime.exs
-if config_env() == :prod do
-  database_url =
-    System.get_env("DATABASE_URL") ||
-      raise """
-      environment variable DATABASE_URL is missing.
-      """
-
-  config :hudson, Hudson.Repo,
-    url: database_url,
-    pool_size: String.to_integer(System.get_env("POOL_SIZE") || "10"),
-    ssl: true,
-    ssl_opts: [
-      cacertfile: System.fetch_env!("SUPABASE_CA_CERT"),
-      server_name_indication: 'db.supabase.net'
-    ]
-end
-```
-
-> Tip: Supabase ships a PEM bundle in their dashboard. Check it into `priv/certs/` (safe for public use) or depend on [`:castore`](https://hexdocs.pm/castore/readme.html) and point `cacertfile` there. Never ship `verify: :verify_none`.
-
-Create `.env` file:
-
-```bash
-# .env (DO NOT COMMIT)
-DATABASE_URL=postgresql://postgres:[password]@[project-ref].supabase.co:5432/postgres
-SUPABASE_URL=https://[project-ref].supabase.co
-SUPABASE_ANON_KEY=eyJ...
-SUPABASE_SERVICE_ROLE_KEY=eyJ... # NEVER expose to frontend!
-SUPABASE_CA_CERT=/absolute/path/to/supabase-ca.pem
-SUPABASE_STORAGE_PUBLIC_URL=https://[project-ref].supabase.co/storage/v1/object/public
-```
-
-```elixir
-# config/runtime.exs
-config :hudson, :storage_public_url, System.fetch_env!("SUPABASE_STORAGE_PUBLIC_URL")
-```
-
-Load environment variables:
-
-```bash
-# Install dotenv
-mix archive.install hex dotenv
-
-# Or use direnv
-echo "export $(cat .env | xargs)" > .envrc
-direnv allow
-```
-
-### 1.3 Install Dependencies
-
-Add to `mix.exs`:
-
-```elixir
-defp deps do
-  [
-    # ... existing deps
-    {:supabase_potion, "~> 0.5"},  # Supabase client
-    {:earmark, "~> 1.4"},           # Markdown rendering
-    {:jason, "~> 1.4"},
-    {:telemetry_metrics, "~> 0.6"},
-    {:telemetry_poller, "~> 1.0"}
-  ]
-end
-```
-
-```bash
-mix deps.get
-```
-
-### 1.4 Create Database
-
-```bash
-mix ecto.create
-```
-
-### 1.5 Configure Authentication Gate (MVP)
-
-MVP still gates access with shared secrets, but they must be treated like real credentials:
-
-1. **Create role-specific secrets** (`PRODUCER_SHARED_SECRET`, `TALENT_SHARED_SECRET`, `ADMIN_SHARED_SECRET`) and store them in `.env`.
-2. **Hash secrets on boot** with `Bcrypt.hash_pwd_salt/1` and keep only the hash in memory.
-3. **Verify logins** with `Bcrypt.verify_pass/2`; on success, issue a signed session token that encodes the role and expires after 4 hours.
-4. **Throttle** the `/login` POST route (e.g., [`Hammer`](https://hexdocs.pm/hammer/readme.html) or `Phoenix.LiveView.RateLimiter`) to 5 attempts / minute / IP and lock the user out for 5 minutes on repeated failures.
-5. **Log audit events** (login, logout, elevated actions) to `Logger` + structured metadata so you can trace producer actions later.
-
-```elixir
-# config/runtime.exs
-config :hudson, Hudson.Auth,
-  producer_secret_hash: Bcrypt.hash_pwd_salt(System.fetch_env!("PRODUCER_SHARED_SECRET")),
-  talent_secret_hash: Bcrypt.hash_pwd_salt(System.fetch_env!("TALENT_SHARED_SECRET")),
-  admin_secret_hash: Bcrypt.hash_pwd_salt(System.fetch_env!("ADMIN_SHARED_SECRET")),
-  session_ttl: 4 * 60 * 60
-```
-
-Designate plugs (`HudsonWeb.RequireProducer`, etc.) now so migrating to `mix phx.gen.auth` later is drop-in.
+- [ ] **Authentication Gate** - Hash shared secrets, session tokens, rate limiting (§5)
+- [ ] **Production Deployment** - Windows service, desktop packaging (§6)
 
 ---
 
-## 2. Implement Domain Model
+## 1. Supabase Storage Integration
 
-### 2.1 Generate Migrations
+**Status:** Configuration ready, upload functionality not implemented
+**Priority:** High for MVP
 
-See [Domain Model](domain_model.md) for full schema definitions. Generate migrations in order:
+### MVP Approach (No Authentication)
 
-```bash
-mix phx.gen.context Catalog Brand brands name:string slug:string:unique notes:text
+Since Hudson is used locally by internal team only, we're skipping authentication for MVP. This simplifies the storage setup:
 
-mix phx.gen.context Catalog Product products \
-  brand_id:references:brands \
-  display_number:integer \
-  name:string \
-  short_name:string \
-  description:text \
-  talking_points_md:text \
-  original_price_cents:integer \
-  sale_price_cents:integer \
-  pid:string:unique \
-  sku:string \
-  stock:integer \
-  is_featured:boolean \
-  external_url:string
+- **Public read access** - No RLS policies needed
+- **Service role for writes** - Upload images using SUPABASE_SERVICE_ROLE_KEY
+- **Simple bucket permissions** - Single "products" bucket with public visibility
 
-mix phx.gen.context Catalog ProductImage product_images \
-  product_id:references:products \
-  position:integer \
-  path:string \
-  thumbnail_path:string \
-  alt_text:string \
-  is_primary:boolean
+### 1.1 Create Storage Bucket
 
-# Continue for Sessions, Hosts, SessionProducts, SessionState...
+In Supabase Dashboard:
+1. Navigate to Storage → Create bucket
+2. Bucket name: `products`
+3. Set as **Public bucket** (toggle on)
+4. Click "Create bucket"
+
+### 1.2 Verify Bucket Configuration
+
+No RLS policies needed since bucket is public. All images will be publicly readable via:
+```
+https://[project-ref].supabase.co/storage/v1/object/public/products/[path]
 ```
 
-### 2.2 Manual Migration Adjustments
+### 1.3 Upload Implementation
 
-**Add tags array to products:**
+Create `lib/hudson/media.ex`:
 
 ```elixir
-# In products migration
-def change do
-  create table(:products) do
-    # ... other fields
-    add :tags, {:array, :string}, default: []
-    # ...
-  end
+defmodule Hudson.Media do
+  @moduledoc """
+  Media upload and management for product images.
+  Uses Supabase Storage with service role for uploads.
+  """
 
-  # Add GIN index for array search
-  create index(:products, [:tags], using: :gin)
-end
-```
+  alias Supabase.Storage
 
-**Add cascade deletes:**
+  @storage_public_url Application.compile_env(:hudson, :storage_public_url)
 
-```elixir
-# In product_images migration
-add :product_id, references(:products, on_delete: :delete_all), null: false
+  def upload_product_image(file_path, product_id, position) do
+    client = build_client()
 
-# In session_products migration
-add :session_id, references(:sessions, on_delete: :delete_all), null: false
-```
+    # Upload full-size image
+    full_path = "#{product_id}/full/#{position}.jpg"
 
-### 2.3 Run Migrations
+    with {:ok, file_binary} <- File.read(file_path),
+         {:ok, _response} <- Storage.upload(client, "products", full_path, file_binary, [
+           content_type: "image/jpeg",
+           upsert: true
+         ]) do
+      # Generate and upload thumbnail
+      case generate_and_upload_thumbnail(client, file_path, product_id, position) do
+        {:ok, thumb_path} ->
+          {:ok, %{path: full_path, thumbnail_path: thumb_path}}
 
-```bash
-mix ecto.migrate
-```
-
-> Why the extra ceremony? Holding a `FOR UPDATE` lock and broadcasting from inside the transaction prevents concurrent producer actions from overwriting each other, and the zero-image guard lets the UI show a friendly warning instead of crashing LiveView with `rem/2` on 0.
-
----
-
-## 3. Implement SessionRunLive (Talent/Producer View)
-
-This is the core LiveView for live session control.
-
-### 3.1 Create LiveView Module
-
-```elixir
-# lib/hudson_web/live/session_run_live.ex
-defmodule HudsonWeb.SessionRunLive do
-  use HudsonWeb, :live_view
-  alias Hudson.{Sessions, Catalog}
-
-  @impl true
-  def mount(%{"id" => session_id} = params, _session, socket) do
-    session = Sessions.get_session!(session_id)
-    mode = Map.get(params, "view", "talent")
-
-    socket =
-      socket
-      |> assign(
-        session: session,
-        session_id: session_id,
-        mode: mode,
-        page_title: session.name,
-
-        # CRITICAL: Temporary assigns for memory management
-        temporary_assigns: [
-          current_session_product: nil,
-          current_product: nil,
-          talking_points_html: nil,
-          product_images: nil,
-          next_products_preview: nil
-        ]
-      )
-
-    # Subscribe to PubSub ONLY after WebSocket connection
-    if connected?(socket) do
-      subscribe_to_session(session_id)
-      socket = load_initial_state(socket, params)
-      {:ok, socket}
-    else
-      # Minimal work during HTTP mount
-      {:ok, socket}
+        {:error, _reason} ->
+          # If thumbnail fails, still return success with full image
+          {:ok, %{path: full_path, thumbnail_path: full_path}}
+      end
     end
   end
 
-  @impl true
-  def handle_params(params, _uri, socket) do
-    # Handle URL parameter changes (from push_patch or back button)
-    socket = load_state_from_params(socket, params)
-    {:noreply, socket}
-  end
+  defp generate_and_upload_thumbnail(client, source_file, product_id, position) do
+    # Generate 20px wide thumbnail with blur
+    thumb_tmp = System.tmp_dir!() <> "/thumb_#{product_id}_#{position}.jpg"
 
-  # Primary navigation: Direct jump to product by number
-  @impl true
-  def handle_event("jump_to_product", %{"position" => position}, socket) do
-    position = String.to_integer(position)
+    # Using ImageMagick convert command
+    case System.cmd("convert", [
+      source_file,
+      "-resize", "20x",
+      "-quality", "50",
+      "-blur", "0x2",
+      thumb_tmp
+    ]) do
+      {_, 0} ->
+        thumb_path = "#{product_id}/thumb/#{position}.jpg"
 
-    case Sessions.jump_to_product(socket.assigns.session_id, position) do
-      {:ok, new_state} ->
-        socket =
-          push_patch(socket,
-            to:
-              ~p"/sessions/#{socket.assigns.session_id}/run?sp=#{new_state.current_session_product_id}&img=0"
-          )
-
-        {:noreply, socket}
-
-      {:error, :invalid_position} ->
-        {:noreply, put_flash(socket, :error, "Invalid product number")}
-    end
-  end
-
-  # Convenience navigation: Sequential next/previous with arrow keys
-  @impl true
-  def handle_event("next_product", _params, socket) do
-    case Sessions.advance_to_next_product(socket.assigns.session_id) do
-      {:ok, new_state} ->
-        socket =
-          push_patch(socket,
-            to:
-              ~p"/sessions/#{socket.assigns.session_id}/run?sp=#{new_state.current_session_product_id}&img=#{new_state.current_image_index}"
-          )
-
-        {:noreply, socket}
-
-      {:error, :end_of_session} ->
-        {:noreply, put_flash(socket, :info, "End of session reached")}
-    end
-  end
-
-  @impl true
-  def handle_event("previous_product", _params, socket) do
-    case Sessions.go_to_previous_product(socket.assigns.session_id) do
-      {:ok, new_state} ->
-        socket =
-          push_patch(socket,
-            to:
-              ~p"/sessions/#{socket.assigns.session_id}/run?sp=#{new_state.current_session_product_id}&img=#{new_state.current_image_index}"
-          )
-
-        {:noreply, socket}
-
-      {:error, :start_of_session} ->
-        {:noreply, put_flash(socket, :info, "Already at first product")}
-    end
-  end
-
-  @impl true
-  def handle_event("next_image", _params, socket) do
-    {:ok, _state} = Sessions.cycle_product_image(socket.assigns.session_id, :next)
-    {:noreply, socket}
-  end
-
-  @impl true
-  def handle_event("previous_image", _params, socket) do
-    {:ok, _state} = Sessions.cycle_product_image(socket.assigns.session_id, :previous)
-    {:noreply, socket}
-  end
-
-  # Handle PubSub broadcasts from other clients
-  @impl true
-  def handle_info({:state_changed, new_state}, socket) do
-    socket = load_state_from_session_state(socket, new_state)
-    {:noreply, socket}
-  end
-
-  # Private helpers
-
-  defp subscribe_to_session(session_id) do
-    Phoenix.PubSub.subscribe(Hudson.PubSub, "session:#{session_id}:state")
-  end
-
-  defp load_initial_state(socket, params) do
-    session_id = socket.assigns.session_id
-
-    # Priority: URL params > DB state > first product
-    case params do
-      %{"sp" => sp_id, "img" => img_idx} ->
-        load_by_session_product_id(socket, sp_id, String.to_integer(img_idx))
-
-      _ ->
-        case Sessions.get_session_state(session_id) do
-          {:ok, state} ->
-            load_state_from_session_state(socket, state)
-
-          {:error, :not_found} ->
-            # Initialize to first product
-            {:ok, state} = Sessions.initialize_session_state(session_id)
-            load_state_from_session_state(socket, state)
+        with {:ok, thumb_binary} <- File.read(thumb_tmp),
+             {:ok, _response} <- Storage.upload(client, "products", thumb_path, thumb_binary, [
+               content_type: "image/jpeg",
+               upsert: true
+             ]) do
+          File.rm(thumb_tmp)
+          {:ok, thumb_path}
         end
-    end
-  end
-
-  defp load_state_from_params(socket, params) do
-    case params do
-      %{"sp" => sp_id, "img" => img_idx} ->
-        load_by_session_product_id(socket, sp_id, String.to_integer(img_idx))
 
       _ ->
-        socket
+        {:error, :thumbnail_generation_failed}
     end
   end
 
-  defp load_by_session_product_id(socket, session_product_id, image_index) do
-    session_product = Sessions.get_session_product!(session_product_id)
-    product = Catalog.get_product_with_images!(session_product.product_id)
-
-    # Preload adjacent products (±2 positions) for arrow key convenience
-    # Full session preloading handled progressively in background
-    adjacent_products = Sessions.get_adjacent_session_products(
-      socket.assigns.session_id,
-      session_product.position,
-      2
-    )
-
-    assign(socket,
-      current_session_product: session_product,
-      current_product: product,
-      current_image_index: image_index,
-      current_position: session_product.position,
-      talking_points_html: render_markdown(
-        session_product.featured_talking_points_md || product.talking_points_md
-      ),
-      product_images: product.product_images,
-      adjacent_products_preview: adjacent_products
-    )
+  def public_image_url(path) when is_binary(path) do
+    "#{@storage_public_url}/products/#{path}"
   end
 
-  defp load_state_from_session_state(socket, state) do
-    load_by_session_product_id(
-      socket,
-      state.current_session_product_id,
-      state.current_image_index
-    )
-  end
+  def public_image_url(_), do: "/images/placeholder.png"
 
-  defp render_markdown(nil), do: nil
-  defp render_markdown(markdown) do
-    case Earmark.as_html(markdown) do
-      {:ok, html, _} -> raw(html)
-      _ -> nil
-    end
+  defp build_client do
+    Supabase.init_client!(
+      Application.fetch_env!(:hudson, :supabase_url),
+      Application.fetch_env!(:hudson, :supabase_service_role_key)
+    )
   end
 end
 ```
 
-### 3.2 Create Template
+**Note:** This implementation requires ImageMagick installed locally:
+```bash
+# macOS
+brew install imagemagick
 
-```elixir
-# lib/hudson_web/live/session_run_live.html.heex
-<div
-  id="session-run-container"
-  class="session-container"
-  phx-hook="KeyboardControl"
->
-  <!-- Header -->
-  <header class="session-header">
-    <div class="session-title"><%= @session.name %></div>
-    <div class="session-info">
-      <div class="product-count">
-        Product <%= @current_position %> / <%= @total_products %>
-      </div>
-      <div id="connection-status" phx-hook="ConnectionStatus" class="connection-status">
-        <span class="connected">● Connected</span>
-      </div>
-    </div>
-  </header>
-
-  <!-- Main Content -->
-  <div class="session-main">
-    <!-- Left: Product Image -->
-    <div class="product-image-container">
-      <%= if @product_images && length(@product_images) > 0 do %>
-        <%= render_slot(:image_viewer,
-          images: @product_images,
-          current_index: @current_image_index,
-          product_id: @current_product.id
-        ) %>
-      <% else %>
-        <div class="no-images">No images available</div>
-      <% end %>
-    </div>
-
-    <!-- Right: Product Info & Talking Points -->
-    <div class="product-details">
-      <!-- Product Header -->
-      <div class="product-header">
-        <h1 class="product-name">
-          <%= @current_session_product.featured_name || @current_product.name %>
-        </h1>
-        <div class="product-pricing">
-          <%= if @current_session_product.featured_sale_price_cents || @current_product.sale_price_cents do %>
-            <span class="sale-price">
-              <%= format_price(@current_session_product.featured_sale_price_cents || @current_product.sale_price_cents) %>
-            </span>
-            <span class="original-price">
-              <%= format_price(@current_session_product.featured_original_price_cents || @current_product.original_price_cents) %>
-            </span>
-          <% else %>
-            <span class="price">
-              <%= format_price(@current_session_product.featured_original_price_cents || @current_product.original_price_cents) %>
-            </span>
-          <% end %>
-        </div>
-        <div class="product-meta">
-          <div>PID: <%= @current_product.pid %></div>
-          <div>SKU: <%= @current_product.sku %></div>
-          <%= if @current_product.stock do %>
-            <div>Stock: <%= @current_product.stock %></div>
-          <% end %>
-        </div>
-      </div>
-
-      <!-- Talking Points -->
-      <div class="talking-points">
-        <%= @talking_points_html %>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Add corresponding CSS in assets/css/app.css -->
-<style>
-.session-container {
-  height: 100vh;
-  background: #1a1a1a;
-  color: #f0f0f0;
-}
-
-.session-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1rem 1.5rem;
-  background: #2a2a2a;
-  border-bottom: 1px solid #444;
-}
-
-.session-title {
-  font-size: 1.125rem;
-  font-weight: 600;
-}
-
-.session-info {
-  display: flex;
-  gap: 1.5rem;
-  align-items: center;
-}
-
-.product-count {
-  font-size: 0.875rem;
-  color: #999;
-}
-
-.connection-status .connected {
-  color: #4ade80;
-}
-
-.session-main {
-  display: flex;
-  height: calc(100vh - 5rem);
-}
-
-.product-image-container {
-  flex: 3;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 2rem;
-  background: #0a0a0a;
-}
-
-.no-images {
-  color: #666;
-  font-size: 1.5rem;
-}
-
-.product-details {
-  flex: 2;
-  display: flex;
-  flex-direction: column;
-  padding: 2rem;
-  overflow-y: auto;
-}
-
-.product-header {
-  margin-bottom: 2rem;
-}
-
-.product-name {
-  font-size: 2.25rem;
-  font-weight: 700;
-  margin-bottom: 0.5rem;
-}
-
-.product-pricing {
-  display: flex;
-  gap: 1rem;
-  align-items: baseline;
-  margin-bottom: 1rem;
-}
-
-.sale-price {
-  font-size: 1.875rem;
-  font-weight: 700;
-  color: #4ade80;
-}
-
-.original-price {
-  font-size: 1.25rem;
-  color: #999;
-  text-decoration: line-through;
-}
-
-.price {
-  font-size: 1.875rem;
-  font-weight: 700;
-}
-
-.product-meta {
-  display: flex;
-  gap: 1.5rem;
-  font-size: 0.875rem;
-  color: #999;
-  font-family: monospace;
-}
-
-.talking-points {
-  font-size: 1.5rem;
-  line-height: 1.6;
-}
-</style>
+# Ubuntu/Debian
+apt-get install imagemagick
 ```
 
-### 3.3 Keyboard Control Hook
+### 1.4 Update Seeds for Testing
 
-```javascript
-// assets/js/hooks.js
-const Hooks = {}
-
-Hooks.KeyboardControl = {
-  mounted() {
-    this.jumpBuffer = ""
-    this.jumpTimeout = null
-
-    this.handleKeydown = (e) => {
-      // Prevent default for navigation keys
-      const navKeys = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space']
-      if (navKeys.includes(e.code)) {
-        e.preventDefault()
-      }
-
-      switch (e.code) {
-        // PRIMARY NAVIGATION: Direct jumps
-        case 'Home':
-          this.pushEvent("jump_to_product", {position: 1})
-          break
-
-        case 'End':
-          this.pushEvent("jump_to_last_product", {})
-          break
-
-        // CONVENIENCE: Sequential navigation with arrow keys
-        case 'ArrowDown':
-        case 'KeyJ':
-          this.pushEvent("next_product", {})
-          break
-
-        case 'ArrowUp':
-        case 'KeyK':
-          this.pushEvent("previous_product", {})
-          break
-
-        case 'Space':
-          this.pushEvent("next_product", {})
-          break
-
-        // IMAGE navigation (always sequential)
-        case 'ArrowRight':
-        case 'KeyL':
-          this.pushEvent("next_image", {})
-          break
-
-        case 'ArrowLeft':
-        case 'KeyH':
-          this.pushEvent("previous_image", {})
-          break
-
-        default:
-          // PRIMARY NAVIGATION: Number input for jump-to-product
-          if (e.key >= '0' && e.key <= '9') {
-            this.handleNumberInput(e.key)
-          } else if (e.code === 'Enter' && this.jumpBuffer) {
-            this.pushEvent("jump_to_product", {position: this.jumpBuffer})
-            this.jumpBuffer = ""
-            clearTimeout(this.jumpTimeout)
-          }
-      }
-    }
-
-    this.handleNumberInput = (digit) => {
-      this.jumpBuffer += digit
-
-      // Clear buffer after 2 seconds of inactivity
-      clearTimeout(this.jumpTimeout)
-      this.jumpTimeout = setTimeout(() => {
-        this.jumpBuffer = ""
-      }, 2000)
-
-      // Show visual feedback (implement UI for this)
-      console.log("Jump to:", this.jumpBuffer)
-    }
-
-    window.addEventListener("keydown", this.handleKeydown)
-  },
-
-  destroyed() {
-    window.removeEventListener("keydown", this.handleKeydown)
-    clearTimeout(this.jumpTimeout)
-  }
-}
-
-Hooks.ConnectionStatus = {
-  mounted() {
-    window.addEventListener("phx:page-loading-start", () => {
-      this.el.innerHTML = '<span class="reconnecting">● Reconnecting...</span>'
-    })
-
-    window.addEventListener("phx:page-loading-stop", () => {
-      this.el.innerHTML = '<span class="connected">● Connected</span>'
-    })
-  }
-}
-
-export default Hooks
-```
-
-Register hooks in `assets/js/app.js`:
-
-```javascript
-import Hooks from "./hooks"
-
-let liveSocket = new LiveSocket("/live", Socket, {
-  params: {_csrf_token: csrfToken},
-  hooks: Hooks
-})
-```
+After uploading real images, update `priv/repo/seeds.exs` to use actual paths instead of placeholders.
 
 ---
 
-## 4. Image Loading with LQIP Pattern
+## 2. LQIP Image Loading Pattern
 
-### 4.1 Generate Thumbnails
+**Status:** Basic placeholders implemented, LQIP pattern not complete
+**Priority:** High for production (improves perceived performance)
+
+### Current Implementation
+
+Basic image display with placeholder URLs:
+```elixir
+# lib/hudson_web/live/session_run_live.ex:255-260
+def public_image_url(path) when is_binary(path) do
+  base_url = Application.get_env(:hudson, :storage_public_url, "")
+  "#{base_url}/products/#{path}"
+end
+```
+
+### Remaining Work
+
+#### 2.1 Generate Thumbnails
 
 Create helper to generate low-quality placeholders:
 
@@ -727,7 +195,7 @@ defmodule Hudson.Media do
   end
 
   def upload_with_thumbnail(file_path, product_id) do
-    # Upload full-size image and capture the object path (NOT a signed URL)
+    # Upload full-size image
     full_path = upload_to_supabase(file_path, "products/#{product_id}/full/")
 
     # Generate and upload thumbnail
@@ -745,25 +213,7 @@ defmodule Hudson.Media do
 end
 ```
 
-### 4.2 Add thumbnail_path to ProductImage
-
-```bash
-mix ecto.gen.migration add_thumbnail_path_to_product_images
-```
-
-```elixir
-defmodule Hudson.Repo.Migrations.AddThumbnailPathToProductImages do
-  use Ecto.Migration
-
-  def change do
-    alter table(:product_images) do
-      add :thumbnail_path, :string
-    end
-  end
-end
-```
-
-### 4.3 LQIP Component
+#### 2.2 LQIP Component
 
 ```elixir
 # lib/hudson_web/components/image_components.ex
@@ -778,8 +228,8 @@ defmodule HudsonWeb.ImageComponents do
 
   def lqip_image(assigns) do
     ~H"""
-    <div class={"relative #{@class}"}>
-      <!-- Skeleton loader (shown while thumbnail loads) -->
+    <div class={"lqip-container #{@class}"}>
+      <!-- Skeleton loader -->
       <div id={"skeleton-#{@id}"} class="lqip-skeleton" />
 
       <!-- Low-quality placeholder -->
@@ -807,27 +257,29 @@ defmodule HudsonWeb.ImageComponents do
 end
 ```
 
-### 4.4 LQIP CSS
+#### 2.3 LQIP CSS
+
+Add to `assets/css/app.css`:
 
 ```css
-/* assets/css/app.css */
-:root {
-  --img-blur: 20px;
-  --img-scale: 1.05;
-  --img-transition-duration: 0.8s;
+/* LQIP Image Loading */
+.lqip-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
 }
 
 .lqip-image {
   width: 100%;
   height: 100%;
   object-fit: contain;
-  filter: blur(var(--img-blur));
-  transform: scale(var(--img-scale));
+  filter: blur(20px);
+  transform: scale(1.05);
   opacity: 0;
   transition:
-    filter var(--img-transition-duration) ease-out,
-    transform var(--img-transition-duration) ease-out,
-    opacity var(--img-transition-duration) ease-out;
+    filter 0.8s ease-out,
+    transform 0.8s ease-out,
+    opacity 0.8s ease-out;
 }
 
 .lqip-image[data-js-loading="false"] {
@@ -846,7 +298,9 @@ end
   height: 100%;
   object-fit: contain;
   opacity: 1;
-  transition: opacity var(--img-transition-duration) ease-out;
+  transition: opacity 0.8s ease-out;
+  filter: blur(20px);
+  transform: scale(1.05);
 }
 
 .lqip-placeholder[data-js-placeholder-loaded="true"] {
@@ -860,7 +314,12 @@ end
   left: 0;
   right: 0;
   bottom: 0;
-  background: linear-gradient(90deg, #2a2a2a 25%, #3a3a3a 50%, #2a2a2a 75%);
+  background: linear-gradient(
+    90deg,
+    var(--bg-medium) 25%,
+    var(--bg-light) 50%,
+    var(--bg-medium) 75%
+  );
   background-size: 200% 100%;
   animation: loading 1.5s infinite;
 }
@@ -871,10 +330,11 @@ end
 }
 ```
 
-### 4.5 Image Loading Hook
+#### 2.4 Image Loading Hook
+
+Add to `assets/js/hooks.js`:
 
 ```javascript
-// Add to assets/js/hooks.js
 Hooks.ImageLoadingState = {
   mounted() {
     const mainImage = this.el
@@ -914,7 +374,9 @@ Hooks.ImageLoadingState = {
 }
 ```
 
-### 4.6 Use in Template
+#### 2.5 Use in Template
+
+Update `session_run_live.html.heex`:
 
 ```elixir
 <% image = Enum.at(@product_images, @current_image_index) %>
@@ -929,544 +391,31 @@ Hooks.ImageLoadingState = {
   alt={image.alt_text}
   class="product-image"
 />
-
-Because the bucket is world-readable, these URLs never expire, and the CDN handles caching for the entire session automatically.
-```
-
-**CSS for product image container:**
-```css
-.product-image {
-  max-height: 70vh;
-}
 ```
 
 ---
 
-## 5. Implement Sessions Context Functions
+## 3. CSV Import System
 
-### 5.1 State Management Functions
+**Status:** Not implemented
+**Priority:** Medium (manual entry sufficient for MVP)
 
-```elixir
-# lib/hudson/sessions.ex
-defmodule Hudson.Sessions do
-  import Ecto.Query
-  alias Hudson.Repo
-  alias Hudson.Sessions.{Session, SessionProduct, SessionState}
-
-  def get_session_state(session_id) do
-    case Repo.get_by(SessionState, session_id: session_id) do
-      nil -> {:error, :not_found}
-      state -> {:ok, Repo.preload(state, :current_session_product)}
-    end
-  end
-
-  def initialize_session_state(session_id) do
-    # Get first session product
-    first_sp =
-      from(sp in SessionProduct,
-        where: sp.session_id == ^session_id,
-        order_by: [asc: sp.position],
-        limit: 1
-      )
-      |> Repo.one()
-
-    if first_sp do
-      %SessionState{}
-      |> SessionState.changeset(%{
-        session_id: session_id,
-        current_session_product_id: first_sp.id,
-        current_image_index: 0
-      })
-      |> Repo.insert()
-      |> broadcast_state_change()
-    else
-      {:error, :no_products}
-    end
-  end
-
-  # PRIMARY NAVIGATION: Direct jump to product by position
-  def jump_to_product(session_id, position) do
-    case Repo.get_by(SessionProduct, session_id: session_id, position: position) do
-      nil ->
-        {:error, :invalid_position}
-
-      sp ->
-        update_session_state(session_id, %{
-          current_session_product_id: sp.id,
-          current_image_index: 0
-        })
-    end
-  end
-
-  # CONVENIENCE: Sequential navigation with arrow keys
-  def advance_to_next_product(session_id) do
-    with {:ok, current_state} <- get_session_state(session_id),
-         {:ok, current_sp} <- get_current_session_product(current_state),
-         {:ok, next_sp} <- get_next_session_product(session_id, current_sp.position) do
-      update_session_state(session_id, %{
-        current_session_product_id: next_sp.id,
-        current_image_index: 0
-      })
-    else
-      {:error, :no_next_product} -> {:error, :end_of_session}
-      error -> error
-    end
-  end
-
-  def go_to_previous_product(session_id) do
-    with {:ok, current_state} <- get_session_state(session_id),
-         {:ok, current_sp} <- get_current_session_product(current_state),
-         {:ok, prev_sp} <- get_previous_session_product(session_id, current_sp.position) do
-      update_session_state(session_id, %{
-        current_session_product_id: prev_sp.id,
-        current_image_index: 0
-      })
-    else
-      {:error, :no_previous_product} -> {:error, :start_of_session}
-      error -> error
-    end
-  end
-
-  def cycle_product_image(session_id, direction) do
-    with {:ok, state} <- get_session_state(session_id),
-         {:ok, sp} <- get_current_session_product(state),
-         product <- Repo.preload(sp.product, :product_images),
-         image_count when image_count > 0 <- length(product.product_images) do
-      new_index =
-        case direction do
-          :next -> rem(state.current_image_index + 1, image_count)
-          :previous -> rem(state.current_image_index - 1 + image_count, image_count)
-        end
-
-      update_session_state(session_id, %{current_image_index: new_index})
-    else
-      0 -> {:error, :no_images}
-      error -> error
-    end
-  end
-
-  defp update_session_state(session_id, attrs) do
-    Repo.transaction(fn ->
-      state =
-        SessionState
-        |> Repo.get_by!(session_id: session_id, lock: "FOR UPDATE")
-        |> SessionState.changeset(attrs)
-        |> Repo.update!()
-
-      broadcast_state_change(state)
-      state
-    end)
-    |> case do
-      {:ok, state} -> {:ok, state}
-      {:error, reason} -> {:error, reason}
-    end
-  end
-
-  defp broadcast_state_change(%SessionState{} = state) do
-    Phoenix.PubSub.broadcast(
-      Hudson.PubSub,
-      "session:#{state.session_id}:state",
-      {:state_changed, state}
-    )
-    {:ok, state}
-  end
-
-  defp get_current_session_product(state) do
-    case Repo.get(SessionProduct, state.current_session_product_id) do
-      nil -> {:error, :not_found}
-      sp -> {:ok, Repo.preload(sp, product: :product_images)}
-    end
-  end
-
-  defp get_next_session_product(session_id, current_position) do
-    from(sp in SessionProduct,
-      where: sp.session_id == ^session_id and sp.position > ^current_position,
-      order_by: [asc: sp.position],
-      limit: 1
-    )
-    |> Repo.one()
-    |> case do
-      nil -> {:error, :no_next_product}
-      sp -> {:ok, sp}
-    end
-  end
-
-  defp get_previous_session_product(session_id, current_position) do
-    from(sp in SessionProduct,
-      where: sp.session_id == ^session_id and sp.position < ^current_position,
-      order_by: [desc: sp.position],
-      limit: 1
-    )
-    |> Repo.one()
-    |> case do
-      nil -> {:error, :no_previous_product}
-      sp -> {:ok, sp}
-    end
-  end
-end
-```
-
----
-
-## 6. Router Configuration
+### Implementation
 
 ```elixir
-# lib/hudson_web/router.ex
-defmodule HudsonWeb.Router do
-  use HudsonWeb, :router
-
-  pipeline :browser do
-    plug :accepts, ["html"]
-    plug :fetch_session
-    plug :fetch_live_flash
-    plug :put_root_layout, html: {HudsonWeb.Layouts, :root}
-    plug :protect_from_forgery
-    plug :put_secure_browser_headers
-  end
-
-  scope "/", HudsonWeb do
-    pipe_through :browser
-
-    live "/", PageLive, :index
-
-    # Session management
-    live "/sessions", SessionIndexLive, :index
-    live "/sessions/new", SessionEditLive, :new
-    live "/sessions/:id/edit", SessionEditLive, :edit
-
-    # Live session control (talent/producer view)
-    live "/sessions/:id/run", SessionRunLive, :show
-
-    # Product catalog
-    live "/products", ProductIndexLive, :index
-    live "/products/new", ProductEditLive, :new
-    live "/products/:id/edit", ProductEditLive, :edit
-  end
-
-  # Development routes
-  if Application.compile_env(:hudson, :dev_routes) do
-    import Phoenix.LiveDashboard.Router
-
-    scope "/dev" do
-      pipe_through :browser
-
-      live_dashboard "/dashboard", metrics: HudsonWeb.Telemetry
-    end
-  end
-end
-```
-
----
-
-## 7. Testing
-
-### 7.1 Context Tests
-
-```elixir
-# test/hudson/sessions_test.exs
-defmodule Hudson.SessionsTest do
-  use Hudson.DataCase
-  alias Hudson.Sessions
-
-  describe "jump_to_product/2" do
-    setup do
-      session = insert(:session)
-      sp1 = insert(:session_product, session: session, position: 1)
-      sp5 = insert(:session_product, session: session, position: 5)
-      sp10 = insert(:session_product, session: session, position: 10)
-      {:ok, _state} = Sessions.initialize_session_state(session.id)
-
-      {:ok, session: session, sp1: sp1, sp5: sp5, sp10: sp10}
-    end
-
-    test "jumps directly to product by position", %{session: session, sp10: sp10} do
-      Phoenix.PubSub.subscribe(Hudson.PubSub, "session:#{session.id}:state")
-
-      {:ok, new_state} = Sessions.jump_to_product(session.id, 10)
-
-      assert new_state.current_session_product_id == sp10.id
-      assert new_state.current_image_index == 0
-      assert_receive {:state_changed, ^new_state}
-    end
-
-    test "returns error for invalid position", %{session: session} do
-      {:error, :invalid_position} = Sessions.jump_to_product(session.id, 999)
-    end
-  end
-
-  describe "advance_to_next_product/1" do
-    setup do
-      session = insert(:session)
-      sp1 = insert(:session_product, session: session, position: 1)
-      sp2 = insert(:session_product, session: session, position: 2)
-      {:ok, _state} = Sessions.initialize_session_state(session.id)
-
-      {:ok, session: session, sp1: sp1, sp2: sp2}
-    end
-
-    test "advances to next product and broadcasts", %{session: session, sp2: sp2} do
-      Phoenix.PubSub.subscribe(Hudson.PubSub, "session:#{session.id}:state")
-
-      {:ok, new_state} = Sessions.advance_to_next_product(session.id)
-
-      assert new_state.current_session_product_id == sp2.id
-      assert new_state.current_image_index == 0
-      assert_receive {:state_changed, ^new_state}
-    end
-  end
-end
-```
-
-### 7.2 LiveView Tests
-
-```elixir
-# test/hudson_web/live/session_run_live_test.exs
-defmodule HudsonWeb.SessionRunLiveTest do
-  use HudsonWeb.ConnCase
-  import Phoenix.LiveViewTest
-
-  test "navigates to next product on keyboard event", %{conn: conn} do
-    session = insert(:session)
-    sp1 = insert(:session_product, session: session, position: 1)
-    sp2 = insert(:session_product, session: session, position: 2)
-
-    {:ok, view, _html} = live(conn, ~p"/sessions/#{session}/run")
-
-    # Simulate keyboard event via hook
-    render_hook(view, "keydown", %{"code" => "ArrowDown"})
-
-    # Check that we navigated to product 2
-    assert has_element?(view, "#current-product-#{sp2.product_id}")
-  end
-end
-```
-
----
-
-## 8. Performance Checklist
-
-### Critical Performance Patterns
-
-- [ ] ✅ Use `temporary_assigns` for render-only data
-- [ ] ✅ Use `streams` for large collections
-- [ ] ✅ Preload associations to avoid N+1 queries
-- [ ] ✅ Subscribe to PubSub only in `connected?(socket)`
-- [ ] ✅ Use `push_patch` instead of full navigation
-- [ ] ✅ Debounce rapid user input with `phx-debounce`
-- [ ] ✅ Monitor socket memory with telemetry
-- [ ] ✅ Use LQIP for smooth image loading
-- [ ] ✅ Preload adjacent products (±2) + progressive background preload (arbitrary navigation)
-- [ ] ✅ Clean up event listeners in hook `destroyed()`
-
----
-
-## 9. Next Steps
-
-1. **Implement SessionEditLive** - Session builder with product picker
-2. **Add Authentication** - Hash the producer/talent/admin secrets and enable throttled session tokens (see §1.5)
-3. **Implement CSV Import** - See [Import Guide](import_guide.md)
-4. **Add Supabase Storage** - Image upload functionality
-5. **Deploy to Production** - See [Deployment Guide](deployment.md)
-6. **Load Testing** - Test 3-4 hour sessions
-7. **User Training** - Document keyboard shortcuts
-
----
-
-## Summary
-
-This implementation guide provides:
-- Complete LiveView setup with memory management
-- Keyboard-driven navigation with JS hooks
-- LQIP image loading for smooth transitions
-- Real-time state synchronization via PubSub
-- URL-based state persistence
-- Test coverage for critical paths
-
-All patterns are optimized for 3-4 hour live streaming sessions with multiple synchronized clients.
-
----
-
-## 10. Deployment Setup
-
-### 10.1 Localhost Deployment (MVP)
-
-**Configuration:**
-
-```elixir
-# config/runtime.exs
-if config_env() == :prod do
-  database_url =
-    System.get_env("DATABASE_URL") ||
-      raise "DATABASE_URL not set"
-
-  config :hudson, Hudson.Repo,
-    url: database_url,
-    pool_size: String.to_integer(System.get_env("POOL_SIZE") || "10"),
-    ssl: true,
-    ssl_opts: [
-      cacertfile: System.fetch_env!("SUPABASE_CA_CERT"),
-      server_name_indication: 'db.supabase.net'
-    ]
-
-  config :hudson, HudsonWeb.Endpoint,
-    server: true,  # CRITICAL for deployment
-    http: [port: String.to_integer(System.get_env("PORT") || "4000")]
-end
-```
-
-**Environment Variables:**
-
-Use the same `.env` entries described in [Project Setup](#12-configure-authentication-gate-mvp), plus `PORT`, `SUPABASE_CA_CERT`, and `SUPABASE_STORAGE_PUBLIC_URL`.
-
-### 10.2 Supabase Security
-
-**Bucket Policies (Public Read, Server-Controlled Writes):**
-
-```sql
--- Allow anyone (anon/public) to view product images
-CREATE POLICY "Public read access to product images"
-ON storage.objects FOR SELECT
-TO public
-USING (bucket_id = 'products');
-
--- Only service role (via Supabase dashboard/API) can upload/delete
-CREATE POLICY "Only service role can write product images"
-ON storage.objects FOR INSERT
-TO service_role
-WITH CHECK (bucket_id = 'products');
-
-CREATE POLICY "Only service role can delete product images"
-ON storage.objects FOR DELETE
-TO service_role
-USING (bucket_id = 'products');
-```
-
-With this setup, LiveView can build public CDN URLs via `Hudson.Media.public_image_url/1` (see §4.1), while uploads still require the service key on the server.
-
-- Persist only `path`/`thumbnail_path` in the database.
-- Let Supabase's CDN handle caching—once the page swaps images, the URLs stay valid for the entire session without extra timers.
-
-### 10.3 Windows Service Setup
-
-**Using NSSM:**
-
-```powershell
-# Install service
-nssm install Hudson "C:\path\to\hudson.exe"
-nssm set Hudson AppDirectory "C:\path\to\app"
-nssm set Hudson Start SERVICE_AUTO_START
-nssm start Hudson
-```
-
-**Desktop Packaging Options:**
-
-- **Burrito** (Recommended for MVP) - Single executable, ~15MB
-- **Elixir Desktop** (Long-term) - Native app, installers coming soon
-- **Tauri + Burrito** (Advanced) - Smallest binary (3-10MB), complex setup
-
-_See [Future Roadmap](future_roadmap.md) for detailed packaging comparison._
-
----
-
-## 11. Error Handling & Recovery
-
-### 11.1 Connection Status UI
-
-**JavaScript Hook:**
-
-```javascript
-Hooks.ConnectionStatus = {
-  mounted() {
-    window.addEventListener("phx:page-loading-start", () => {
-      this.el.innerHTML = '<span class="reconnecting">● Reconnecting...</span>'
-    })
-
-    window.addEventListener("phx:page-loading-stop", () => {
-      this.el.innerHTML = '<span class="connected">● Connected</span>'
-      setTimeout(() => this.el.innerHTML = "", 2000)
-    })
-  }
-}
-```
-
-**Template:**
-
-```elixir
-<div id="connection-status" phx-hook="ConnectionStatus" class="status-indicator"></div>
-```
-
-### 11.2 Error Recovery Patterns
-
-**Graceful Database Errors:**
-
-```elixir
-def get_session_state_with_fallback(session_id) do
-  case get_session_state(session_id) do
-    {:ok, state} -> state
-    {:error, _} -> %SessionState{session_id: session_id, current_image_index: 0}
-  end
-end
-```
-
-**Idempotent Operations:**
-
-```elixir
-def advance_to_next_product(session_id) do
-  operation_id = generate_operation_id()
-  
-  if not operation_recently_processed?(session_id, operation_id) do
-    do_advance_to_next_product(session_id)
-    record_operation(session_id, operation_id)
-  else
-    {:ok, get_current_state(session_id)}
-  end
-end
-```
-
-### 11.3 State Recovery on Reconnect
-
-LiveView automatically reconnects. On reconnect, `mount/3` recovers state:
-
-```elixir
-def mount(%{"id" => session_id} = params, _session, socket) do
-  if connected?(socket) do
-    # Recover state from URL params or DB
-    state = case params do
-      %{"sp" => sp_id} -> load_by_id(sp_id)
-      _ -> get_session_state(session_id) || get_first_product_state(session_id)
-    end
-    
-    {:ok, assign(socket, state)}
-  else
-    {:ok, socket}
-  end
-end
-```
-
----
-
-## 12. CSV Import Implementation
-
-### 12.1 Import Module
-
-```elixir
+# lib/hudson/import.ex
 defmodule Hudson.Import do
   alias NimbleCSV.RFC4180, as: CSV
   alias Ecto.Multi
   alias Hudson.Repo
 
-  @doc """
-  Stream the CSV so giant files do not blow memory, normalize each row, and wrap
-  the writes in a transaction so a single bad record never leaves partial data
-  in the catalog/session tables.
-  """
   def import_csv(file_path, opts) do
     {rows, errors} =
       file_path
       |> File.stream!()
       |> CSV.parse_stream(skip_headers: false)
       |> Stream.drop(1) # remove header row
-      |> Stream.with_index(2) # CSV line numbers (accounting for header)
+      |> Stream.with_index(2) # CSV line numbers
       |> Enum.reduce({[], []}, fn {row, line}, {acc, errs} ->
         case normalize_row(row) do
           {:ok, normalized} -> {[normalized | acc], errs}
@@ -1488,42 +437,8 @@ defmodule Hudson.Import do
   end
 
   defp normalize_row(row) do
-    %{
-      "name" => name,
-      "pid" => pid,
-      "original_price" => original_price,
-      "sale_price" => sale_price
-    } = row
-
-    with {:ok, original_cents} <- normalize_price(original_price),
-         {:ok, sale_cents} <- normalize_price(sale_price) do
-      {:ok,
-       %{
-         name: name,
-         pid: pid,
-         original_price_cents: original_cents,
-         sale_price_cents: sale_cents
-       }}
-    else
-      {:error, reason} -> {:error, reason}
-    end
-  end
-
-  defp normalize_price(nil), do: {:error, "Price missing"}
-  defp normalize_price(""), do: {:error, "Price missing"}
-  defp normalize_price(price_string) do
-    price_string
-    |> String.trim()
-    |> String.replace(~r/[^0-9\.]/, "")
-    |> Decimal.new()
-    |> Decimal.mult(100)
-    |> Decimal.to_integer()
-    |> case do
-      cents when cents > 0 -> {:ok, cents}
-      _ -> {:error, "Price must be positive"}
-    end
-  rescue
-    ArgumentError -> {:error, "Invalid price format"}
+    # Parse CSV row and validate
+    # Return {:ok, normalized_map} or {:error, reason}
   end
 
   defp import_rows(rows, opts) do
@@ -1548,78 +463,314 @@ defmodule Hudson.Import do
 end
 ```
 
-Capture `(line_number, error)` tuples in the response so producers can fix the spreadsheet quickly, and keep the whole import inside a single transaction so you can retry without manual cleanup.
-
-### 12.2 Import Script
-
-```elixir
-# priv/import/import_session.exs
-alias Hudson.{Import, Catalog, Sessions}
-
-session = Sessions.get_session_by_slug!("holiday-2024")
-brand = Catalog.get_brand_by_slug!("pavoi")
-
-Import.import_csv("priv/import/products.csv",
-  brand_id: brand.id,
-  session_id: session.id,
-  upsert: true
-)
-```
-
-### 12.3 CSV Format
-
+**CSV Format:**
 ```csv
 index,name,talking_points,original_price,sale_price,pid,sku
 1,"Necklace","High quality\nBest seller",$49.99,$29.99,TT123,NECK-001
 ```
 
 **Run Import:**
-
 ```bash
 mix run priv/import/import_session.exs
 ```
 
 ---
 
-## 13. Production Checklist
+## 4. Testing
 
-### Pre-Deployment
+**Status:** Not implemented
+**Priority:** Medium
 
-- [ ] All tests passing
-- [ ] Assets compiled (`mix assets.deploy`)
-- [ ] Database migrations run
-- [ ] Environment variables configured
-- [ ] Supabase RLS policies applied
-- [ ] Backup strategy in place
+### 5.1 Context Tests
 
-### Security
+```elixir
+# test/hudson/sessions_test.exs
+defmodule Hudson.SessionsTest do
+  use Hudson.DataCase
+  alias Hudson.Sessions
 
-- [ ] Service role key never in frontend
-- [ ] `.env` in `.gitignore`
-- [ ] HTTPS enabled
-- [ ] Signed URLs for images
-- [ ] Database SSL enabled
+  describe "jump_to_product/2" do
+    setup do
+      session = insert(:session)
+      sp1 = insert(:session_product, session: session, position: 1)
+      sp10 = insert(:session_product, session: session, position: 10)
+      {:ok, _state} = Sessions.initialize_session_state(session.id)
 
-### Performance
+      {:ok, session: session, sp1: sp1, sp10: sp10}
+    end
 
-- [ ] Temporary assigns configured
-- [ ] Streams used for collections
-- [ ] Database indexes created
-- [ ] LQIP pattern implemented
-- [ ] Telemetry metrics configured
+    test "jumps directly to product by position", %{session: session, sp10: sp10} do
+      Phoenix.PubSub.subscribe(Hudson.PubSub, "session:#{session.id}:state")
+
+      {:ok, new_state} = Sessions.jump_to_product(session.id, 10)
+
+      assert new_state.current_session_product_id == sp10.id
+      assert new_state.current_image_index == 0
+      assert_receive {:state_changed, ^new_state}
+    end
+
+    test "returns error for invalid position", %{session: session} do
+      {:error, :invalid_position} = Sessions.jump_to_product(session.id, 999)
+    end
+  end
+end
+```
+
+### 5.2 LiveView Tests
+
+```elixir
+# test/hudson_web/live/session_run_live_test.exs
+defmodule HudsonWeb.SessionRunLiveTest do
+  use HudsonWeb.ConnCase
+  import Phoenix.LiveViewTest
+
+  test "loads session and displays first product", %{conn: conn} do
+    session = insert(:session)
+    sp1 = insert(:session_product, session: session, position: 1)
+
+    {:ok, view, html} = live(conn, ~p"/sessions/#{session}/run")
+
+    assert html =~ session.name
+    assert has_element?(view, "#product-img-#{sp1.product_id}-0")
+  end
+end
+```
+
+---
+
+## 5. Authentication Gate (Post-MVP)
+
+**Status:** Not implemented
+**Priority:** Low for MVP (local/internal use only)
+
+### MVP Approach
+
+Hudson is designed for local use by internal team members. Authentication is deferred to post-MVP because:
+
+- **Local deployment only** - Runs on localhost, not exposed to internet
+- **Trusted network** - Used by internal team on secure network
+- **Simplified onboarding** - No login required, just start the server
+- **Focus on core features** - Prioritize session control and image loading
+
+### Future Implementation (When Needed)
+
+When deploying to production or remote access is required:
+
+1. **Create role-specific secrets** and store in `.env`:
+   ```bash
+   PRODUCER_SHARED_SECRET=...
+   TALENT_SHARED_SECRET=...
+   ADMIN_SHARED_SECRET=...
+   ```
+
+2. **Hash secrets on boot** in `config/runtime.exs`:
+   ```elixir
+   config :hudson, Hudson.Auth,
+     producer_secret_hash: Bcrypt.hash_pwd_salt(System.fetch_env!("PRODUCER_SHARED_SECRET")),
+     talent_secret_hash: Bcrypt.hash_pwd_salt(System.fetch_env!("TALENT_SHARED_SECRET")),
+     admin_secret_hash: Bcrypt.hash_pwd_salt(System.fetch_env!("ADMIN_SHARED_SECRET")),
+     session_ttl: 4 * 60 * 60
+   ```
+
+3. **Verify logins** with `Bcrypt.verify_pass/2`; issue signed session tokens
+4. **Throttle** `/login` route (e.g., using `Hammer`) to 5 attempts/min/IP
+5. **Log audit events** (login, logout, elevated actions) with structured metadata
+
+Designate plugs (`HudsonWeb.RequireProducer`, etc.) now so migrating to `mix phx.gen.auth` later is drop-in.
+
+---
+
+## 6. Production Deployment (Post-MVP)
+
+**Status:** Not implemented
+**Priority:** Low (localhost sufficient for MVP)
+
+### 6.1 Windows Service Setup (NSSM)
+
+```powershell
+# Install service
+nssm install Hudson "C:\path\to\hudson.exe"
+nssm set Hudson AppDirectory "C:\path\to\app"
+nssm set Hudson Start SERVICE_AUTO_START
+nssm start Hudson
+```
+
+### 6.2 Desktop Packaging Options
+
+- **Burrito** (Recommended for MVP) - Single executable, ~15MB
+- **Elixir Desktop** (Long-term) - Native app with installers
+- **Tauri + Burrito** (Advanced) - Smallest binary (3-10MB), complex setup
+
+See [Future Roadmap](future_roadmap.md) for detailed comparison.
+
+### 6.3 Production Configuration
+
+```elixir
+# config/runtime.exs
+if config_env() == :prod do
+  database_url =
+    System.get_env("DATABASE_URL") ||
+      raise "DATABASE_URL not set"
+
+  config :hudson, Hudson.Repo,
+    url: database_url,
+    pool_size: String.to_integer(System.get_env("POOL_SIZE") || "10"),
+    ssl: true,
+    ssl_opts: [
+      cacertfile: System.fetch_env!("SUPABASE_CA_CERT"),
+      server_name_indication: ~c"db.supabase.net"
+    ]
+
+  config :hudson, HudsonWeb.Endpoint,
+    server: true,  # CRITICAL for deployment
+    http: [port: String.to_integer(System.get_env("PORT") || "4000")]
+end
+```
+
+---
+
+## Performance Checklist
+
+Critical patterns already implemented:
+
+- [x] ✅ Use `temporary_assigns` for render-only data
+- [x] ✅ Preload associations to avoid N+1 queries
+- [x] ✅ Subscribe to PubSub only in `connected?(socket)`
+- [x] ✅ Use `push_patch` instead of full navigation
+- [x] ✅ Debounce rapid user input (keyboard buffer with timeout)
+- [x] ✅ Clean up event listeners in hook `destroyed()`
+- [ ] ⏳ Use LQIP for smooth image loading
+- [ ] ⏳ Monitor socket memory with telemetry
+- [ ] ⏳ Use `streams` for large collections (if needed later)
+
+---
+
+## Current Architecture
+
+### File Structure
+
+```
+lib/
+├── hudson/
+│   ├── catalog/              # Product catalog schemas
+│   │   ├── brand.ex
+│   │   ├── product.ex
+│   │   └── product_image.ex
+│   ├── sessions/             # Live session schemas
+│   │   ├── session.ex
+│   │   ├── session_product.ex
+│   │   └── session_state.ex
+│   ├── catalog.ex            # Catalog context (CRUD)
+│   └── sessions.ex           # Sessions context (state management)
+└── hudson_web/
+    ├── live/
+    │   ├── session_run_live.ex        # Main LiveView
+    │   └── session_run_live.html.heex # Template
+    └── router.ex
+
+assets/
+├── js/
+│   ├── app.js
+│   └── hooks.js              # Keyboard control + connection status
+└── css/
+    └── app.css               # Dark theme styles
+
+priv/
+└── repo/
+    ├── migrations/           # 6 migrations
+    └── seeds.exs             # Sample data (8 products, 1 session)
+```
+
+### Key Implementation Details
+
+**Temporary Assigns (Memory Management):**
+```elixir
+# lib/hudson_web/live/session_run_live.ex:31-36
+{:ok, socket, temporary_assigns: [
+  current_session_product: nil,
+  current_product: nil,
+  talking_points_html: nil,
+  product_images: []
+]}
+```
+
+**State Synchronization:**
+```elixir
+# lib/hudson/sessions.ex:258-266
+defp broadcast_state_change({:ok, %SessionState{} = state}) do
+  Phoenix.PubSub.broadcast(
+    Hudson.PubSub,
+    "session:#{state.session_id}:state",
+    {:state_changed, state}
+  )
+  {:ok, state}
+end
+```
+
+**Keyboard Navigation:**
+- **Primary (Direct Jump):** Type number + Enter (e.g., "23" + Enter)
+- **Convenience (Sequential):** ↑/↓ arrows, J/K keys, Space
+- **Images:** ←/→ arrows, H/L keys
+- **Quick Jump:** Home (first), End (last)
+
+**Database Timestamp Handling:**
+```elixir
+# lib/hudson/sessions/session_state.ex:22
+|> put_change(:updated_at, DateTime.utc_now() |> DateTime.truncate(:second))
+```
+_Note: PostgreSQL `:utc_datetime` rejects microseconds, must truncate to seconds_
+
+---
+
+## Known Issues & Solutions
+
+### Issue: Navigation crashes with "reconnecting..."
+
+**Cause:** `SessionState.updated_at` field rejected microseconds
+**Solution:** Truncate timestamps to seconds in changeset (line 22 of `session_state.ex`)
+
+### Issue: Template errors when state not loaded
+
+**Cause:** Template tried to render before WebSocket connected and loaded state
+**Solution:** Wrap product display in conditional checks for nil assigns
+
+### Issue: Image 404s
+
+**Expected:** Seed data uses placeholder paths (`/products/9/image-1.jpg`)
+**Solution:** Upload real images to Supabase storage or use public URLs
+
+---
+
+## Next Session Checklist
+
+When you're ready to continue development:
+
+1. **Upload real product images** - Test with Supabase storage
+2. **Implement LQIP pattern** - Smooth image transitions
+3. **Add authentication** - Hash secrets, session tokens, rate limiting
+4. **Build CSV import** - Bulk product management
+5. **Write tests** - Context and LiveView coverage
+6. **Deploy to production** - Windows service or desktop app
 
 ---
 
 ## Summary
 
-This comprehensive implementation guide covers:
-- Complete project setup from scratch
-- SessionRunLive with keyboard navigation
-- LQIP image loading pattern
-- State synchronization via PubSub
-- Deployment to localhost/Windows service
-- Error handling and recovery
-- CSV import system
-- Production-ready patterns for 3-4 hour sessions
+**Core MVP is complete and functional:**
+- Real-time session control with PubSub synchronization
+- Keyboard-driven navigation optimized for live streaming
+- Dark theme UI with proper contrast for 3-foot viewing
+- Memory-optimized for 3-4 hour sessions
+- URL-based state persistence (survives refreshes)
+- Database schema with proper associations and constraints
 
-All code examples are tested and optimized for real-world live streaming use.
+**Ready for use:**
+```bash
+mix phx.server
+# Visit: http://localhost:4000/sessions/2/run
+```
+
+**Next priorities:**
+1. Image loading optimization (LQIP)
+2. Supabase storage integration
+3. Authentication gate
