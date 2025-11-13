@@ -100,146 +100,36 @@
 <!-- Host Preview (Right) -->
         <div class="host-preview">
           <div class="host-preview-label">Host View Preview</div>
-          <!-- Floating Host Message Banner -->
-          <%= if @host_message do %>
-            <div class="host-message-banner">
-              <div class="host-message-content">
-                {@host_message.text}
-              </div>
-            </div>
-          <% end %>
-
-          <%= if @current_session_product && @current_product do %>
-            <div class="session-main">
-              <!-- Product Image -->
-              <div class="product-image-container">
-                <%= if @product_images && length(@product_images) > 0 do %>
-                  <% current_image = Enum.at(@product_images, @current_image_index) %>
-                  <%= if current_image do %>
-                    <div class="image-wrapper">
-                      <HudsonWeb.ImageComponents.lqip_image
-                        id={"producer-preview-img-#{@current_product.id}-#{@current_image_index}"}
-                        src={public_image_url(current_image.path)}
-                        thumb_src={
-                          if current_image.thumbnail_path do
-                            public_image_url(current_image.thumbnail_path)
-                          else
-                            public_image_url(current_image.path)
-                          end
-                        }
-                        alt={current_image.alt_text || @current_product.name}
-                        class="product-image"
-                      />
-                    </div>
-                    <div class="image-indicator">
-                      {@current_image_index + 1} / {length(@product_images)}
-                    </div>
-                  <% end %>
-                <% end %>
-              </div>
-              
-<!-- Product Details -->
-              <div class="product-details">
-                <div class="product-header">
-                  <h1 class="product-name">
-                    {get_effective_name(@current_session_product)}
-                  </h1>
-                  <div class="product-pricing">
-                    <% prices = get_effective_prices(@current_session_product) %>
-                    <%= if prices.sale do %>
-                      <span class="sale-price">{format_price(prices.sale)}</span>
-                      <span class="original-price">{format_price(prices.original)}</span>
-                    <% else %>
-                      <span class="price">{format_price(prices.original)}</span>
-                    <% end %>
-                  </div>
-                </div>
-              </div>
-            </div>
-          <% end %>
+          <HudsonWeb.HostViewComponents.host_content
+            session={@session}
+            current_session_product={@current_session_product}
+            current_product={@current_product}
+            product_images={@product_images}
+            current_image_index={@current_image_index}
+            talking_points_html={@talking_points_html}
+            host_message={@host_message}
+            current_position={@current_position}
+            total_products={@total_products}
+            show_header={false}
+            id_prefix="producer-preview"
+          />
         </div>
       </div>
     <% :fullscreen_host -> %>
       <div class="producer-fullscreen-host">
-        <!-- Full Host Preview -->
-        <%= if @host_message do %>
-          <div class="host-message-banner">
-            <div class="host-message-content">
-              {@host_message.text}
-            </div>
-          </div>
-        <% end %>
-
-        <%= if @current_session_product && @current_product do %>
-          <div class="session-main">
-            <!-- Product Image -->
-            <div class="product-image-container">
-              <%= if @product_images && length(@product_images) > 0 do %>
-                <% current_image = Enum.at(@product_images, @current_image_index) %>
-                <%= if current_image do %>
-                  <div class="image-wrapper">
-                    <HudsonWeb.ImageComponents.lqip_image
-                      id={"producer-fullscreen-img-#{@current_product.id}-#{@current_image_index}"}
-                      src={public_image_url(current_image.path)}
-                      thumb_src={
-                        if current_image.thumbnail_path do
-                          public_image_url(current_image.thumbnail_path)
-                        else
-                          public_image_url(current_image.path)
-                        end
-                      }
-                      alt={current_image.alt_text || @current_product.name}
-                      class="product-image"
-                    />
-                  </div>
-                  <div class="image-indicator">
-                    {@current_image_index + 1} / {length(@product_images)}
-                  </div>
-                <% end %>
-              <% end %>
-            </div>
-            
-<!-- Product Details -->
-            <div class="product-details">
-              <div class="product-header">
-                <h1 class="product-name">
-                  {get_effective_name(@current_session_product)}
-                </h1>
-
-                <div class="product-pricing">
-                  <% prices = get_effective_prices(@current_session_product) %>
-                  <%= if prices.sale do %>
-                    <span class="sale-price">{format_price(prices.sale)}</span>
-                    <span class="original-price">{format_price(prices.original)}</span>
-                  <% else %>
-                    <span class="price">{format_price(prices.original)}</span>
-                  <% end %>
-                </div>
-
-                <div class="product-meta">
-                  <%= if @current_product.pid do %>
-                    <div class="meta-item">PID: {@current_product.pid}</div>
-                  <% end %>
-                  <%= if @current_product.sku do %>
-                    <div class="meta-item">SKU: {@current_product.sku}</div>
-                  <% end %>
-                  <%= if @current_product.stock do %>
-                    <div class="meta-item">Stock: {@current_product.stock}</div>
-                  <% end %>
-                </div>
-              </div>
-              
-<!-- Talking Points -->
-              <div class="talking-points">
-                <%= if @talking_points_html do %>
-                  {@talking_points_html}
-                <% else %>
-                  <p class="no-talking-points">No talking points available</p>
-                <% end %>
-              </div>
-            </div>
-          </div>
-        <% end %>
+        <HudsonWeb.HostViewComponents.host_content
+          session={@session}
+          current_session_product={@current_session_product}
+          current_product={@current_product}
+          product_images={@product_images}
+          current_image_index={@current_image_index}
+          talking_points_html={@talking_points_html}
+          host_message={@host_message}
+          current_position={@current_position}
+          total_products={@total_products}
+          show_header={false}
+          id_prefix="producer-fullscreen"
+        />
       </div>
   <% end %>
 </div>
