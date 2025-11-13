@@ -16,11 +16,21 @@
   transition: all var(--transition-fast);
   cursor: pointer;
   white-space: nowrap;
+  text-decoration: none; /* Remove underline for links */
 }
 
 .button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* Override default link styles when used with button class */
+a.button {
+  color: inherit; /* Use button's color, not link color */
+}
+
+a.button:hover {
+  color: inherit; /* Don't change to link hover color */
 }
 
 /* Variants */

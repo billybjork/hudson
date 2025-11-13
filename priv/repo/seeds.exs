@@ -27,19 +27,24 @@ IO.puts("  ✓ Cleared sessions, products, and images")
 
 # Step 2: Ensure brand exists
 IO.puts("\nStep 2: Ensuring brand exists...")
-brand = case Repo.get_by(Brand, slug: "pavoi") do
-  nil ->
-    {:ok, brand} = Catalog.create_brand(%{
-      name: "Pavoi",
-      slug: "pavoi",
-      notes: "Premium jewelry brand"
-    })
-    IO.puts("  ✓ Created Pavoi brand")
-    brand
-  brand ->
-    IO.puts("  ✓ Found existing Pavoi brand")
-    brand
-end
+
+brand =
+  case Repo.get_by(Brand, slug: "pavoi") do
+    nil ->
+      {:ok, brand} =
+        Catalog.create_brand(%{
+          name: "Pavoi",
+          slug: "pavoi",
+          notes: "Premium jewelry brand"
+        })
+
+      IO.puts("  ✓ Created Pavoi brand")
+      brand
+
+    brand ->
+      IO.puts("  ✓ Found existing Pavoi brand")
+      brand
+  end
 
 # Step 3: Sample product data
 IO.puts("\nStep 3: Creating sample products...")
@@ -289,11 +294,12 @@ sample_products = [
 ]
 
 # Create products
-products = Enum.map(sample_products, fn attrs ->
-  {:ok, product} = Catalog.create_product(Map.put(attrs, :brand_id, brand.id))
-  IO.puts("  ✓ Created product ##{product.display_number}: #{product.name}")
-  product
-end)
+products =
+  Enum.map(sample_products, fn attrs ->
+    {:ok, product} = Catalog.create_product(Map.put(attrs, :brand_id, brand.id))
+    IO.puts("  ✓ Created product ##{product.display_number}: #{product.name}")
+    product
+  end)
 
 # Step 4: Generate placeholder images
 IO.puts("\nStep 4: Generating placeholder images...")
@@ -305,10 +311,24 @@ File.mkdir_p!(placeholder_dir)
 
 # Generate simple colored placeholder images for each product
 colors = [
-  "#E8D5C4", "#C9A690", "#8B7355", "#D4AF37", "#FFD700",
-  "#C0C0C0", "#E5E4E2", "#F0E68C", "#DDA0DD", "#B0C4DE",
-  "#F4A460", "#BC8F8F", "#D2B48C", "#F5DEB3", "#FFDAB9",
-  "#E6E6FA", "#D8BFD8", "#DDA0DD"
+  "#E8D5C4",
+  "#C9A690",
+  "#8B7355",
+  "#D4AF37",
+  "#FFD700",
+  "#C0C0C0",
+  "#E5E4E2",
+  "#F0E68C",
+  "#DDA0DD",
+  "#B0C4DE",
+  "#F4A460",
+  "#BC8F8F",
+  "#D2B48C",
+  "#F5DEB3",
+  "#FFDAB9",
+  "#E6E6FA",
+  "#D8BFD8",
+  "#DDA0DD"
 ]
 
 Enum.each(products, fn product ->
@@ -316,32 +336,44 @@ Enum.each(products, fn product ->
   placeholder_path = Path.join(placeholder_dir, "product_#{product.id}.jpg")
 
   # Generate a simple colored square with product number
-  {_output, 0} = System.cmd("magick", [
-    "-size", "800x800",
-    "xc:#{color}",
-    "-pointsize", "120",
-    "-fill", "white",
-    "-gravity", "center",
-    "-annotate", "+0+0", "#{product.display_number}",
-    "-quality", "90",
-    placeholder_path
-  ])
+  {_output, 0} =
+    System.cmd("magick", [
+      "-size",
+      "800x800",
+      "xc:#{color}",
+      "-pointsize",
+      "120",
+      "-fill",
+      "white",
+      "-gravity",
+      "center",
+      "-annotate",
+      "+0+0",
+      "#{product.display_number}",
+      "-quality",
+      "90",
+      placeholder_path
+    ])
 
   # Upload to Supabase
   case Media.upload_product_image(placeholder_path, product.id, 0) do
     {:ok, %{path: path, thumbnail_path: thumb_path}} ->
-      {:ok, _} = Catalog.create_product_image(%{
-        product_id: product.id,
-        path: path,
-        thumbnail_path: thumb_path,
-        position: 0,
-        is_primary: true,
-        alt_text: "#{product.name}"
-      })
+      {:ok, _} =
+        Catalog.create_product_image(%{
+          product_id: product.id,
+          path: path,
+          thumbnail_path: thumb_path,
+          position: 0,
+          is_primary: true,
+          alt_text: "#{product.name}"
+        })
+
       IO.puts("  ✓ Generated image for product ##{product.display_number}")
 
     {:error, reason} ->
-      IO.puts("  ✗ Failed to upload image for product ##{product.display_number}: #{inspect(reason)}")
+      IO.puts(
+        "  ✗ Failed to upload image for product ##{product.display_number}: #{inspect(reason)}"
+      )
   end
 
   # Clean up temp file

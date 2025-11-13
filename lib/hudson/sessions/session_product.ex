@@ -1,4 +1,10 @@
 defmodule Hudson.Sessions.SessionProduct do
+  @moduledoc """
+  Represents a product featured in a live session with optional per-session overrides.
+
+  Links products from the catalog to sessions and allows customization of name,
+  pricing, and talking points specific to a session without modifying the base product.
+  """
   use Ecto.Schema
   import Ecto.Changeset
 

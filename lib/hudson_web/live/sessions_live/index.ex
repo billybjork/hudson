@@ -1,8 +1,9 @@
 defmodule HudsonWeb.SessionsLive.Index do
   use HudsonWeb, :live_view
 
-  alias Hudson.Sessions
   alias Hudson.Catalog
+  alias Hudson.Sessions
+  alias Hudson.Sessions.{Session, SessionProduct}
 
   @impl true
   def mount(_params, _session, socket) do
@@ -18,16 +19,31 @@ defmodule HudsonWeb.SessionsLive.Index do
       |> assign(:available_products, [])
       |> assign(:show_modal_for_session, nil)
       |> assign(:show_new_session_modal, false)
-      |> assign(:product_form, to_form(Hudson.Sessions.SessionProduct.changeset(%Hudson.Sessions.SessionProduct{}, %{})))
-      |> assign(:session_form, to_form(Hudson.Sessions.Session.changeset(%Hudson.Sessions.Session{}, %{})))
+      |> assign(
+        :product_form,
+        to_form(SessionProduct.changeset(%SessionProduct{}, %{}))
+      )
+      |> assign(
+        :session_form,
+        to_form(Session.changeset(%Session{}, %{}))
+      )
 
     {:ok, socket}
   end
 
   @impl true
   def handle_event("keydown", %{"key" => "Escape"}, socket) do
-    # Close all expanded sessions on Escape
-    {:noreply, assign(socket, :expanded_session_ids, MapSet.new())}
+    # Only close expanded sessions if no modal is currently open
+    # If a modal is open, let the modal's own Escape handler close it first
+    modal_open? =
+      socket.assigns.show_new_session_modal or socket.assigns.selected_session_for_product != nil
+
+    if modal_open? do
+      {:noreply, socket}
+    else
+      # Close all expanded sessions on Escape
+      {:noreply, assign(socket, :expanded_session_ids, MapSet.new())}
+    end
   end
 
   @impl true
@@ -46,6 +62,12 @@ defmodule HudsonWeb.SessionsLive.Index do
   end
 
   @impl true
+  def handle_event("stop_propagation", _params, socket) do
+    # No-op handler to prevent event bubbling to parent elements
+    {:noreply, socket}
+  end
+
+  @impl true
   def handle_event("load_products_for_session", %{"session-id" => session_id}, socket) do
     session_id = normalize_id(session_id)
     session = Enum.find(socket.assigns.sessions, &(&1.id == session_id))
@@ -57,16 +79,16 @@ defmodule HudsonWeb.SessionsLive.Index do
     next_position = Sessions.get_next_position_for_session(session_id)
 
     # Create a changeset with default position
-    changeset = Hudson.Sessions.SessionProduct.changeset(%Hudson.Sessions.SessionProduct{}, %{
-      "session_id" => session_id,
-      "position" => next_position
-    })
+    changeset =
+      SessionProduct.changeset(%SessionProduct{}, %{
+        "session_id" => session_id,
+        "position" => next_position
+      })
 
     socket =
       socket
       |> assign(:selected_session_for_product, session)
       |> assign(:available_products, products)
-      |> assign(:show_modal_for_session, session_id)
       |> assign(:product_form, to_form(changeset))
 
     {:noreply, socket}
@@ -75,8 +97,8 @@ defmodule HudsonWeb.SessionsLive.Index do
   @impl true
   def handle_event("validate_product", %{"session_product" => params}, socket) do
     changeset =
-      %Hudson.Sessions.SessionProduct{}
-      |> Hudson.Sessions.SessionProduct.changeset(params)
+      %SessionProduct{}
+      |> SessionProduct.changeset(params)
       |> Map.put(:action, :validate)
 
     {:noreply, assign(socket, :product_form, to_form(changeset))}
@@ -88,7 +110,10 @@ defmodule HudsonWeb.SessionsLive.Index do
       socket
       |> assign(:selected_session_for_product, nil)
       |> assign(:show_modal_for_session, nil)
-      |> assign(:product_form, to_form(Hudson.Sessions.SessionProduct.changeset(%Hudson.Sessions.SessionProduct{}, %{})))
+      |> assign(
+        :product_form,
+        to_form(SessionProduct.changeset(%SessionProduct{}, %{}))
+      )
 
     {:noreply, socket}
   end
@@ -103,7 +128,10 @@ defmodule HudsonWeb.SessionsLive.Index do
     socket =
       socket
       |> assign(:show_new_session_modal, false)
-      |> assign(:session_form, to_form(Hudson.Sessions.Session.changeset(%Hudson.Sessions.Session{}, %{})))
+      |> assign(
+        :session_form,
+        to_form(Session.changeset(%Session{}, %{}))
+      )
 
     {:noreply, socket}
   end
@@ -111,8 +139,8 @@ defmodule HudsonWeb.SessionsLive.Index do
   @impl true
   def handle_event("validate_session", %{"session" => params}, socket) do
     changeset =
-      %Hudson.Sessions.Session{}
-      |> Hudson.Sessions.Session.changeset(params)
+      %Session{}
+      |> Session.changeset(params)
       |> Map.put(:action, :validate)
 
     {:noreply, assign(socket, :session_form, to_form(changeset))}
@@ -135,7 +163,10 @@ defmodule HudsonWeb.SessionsLive.Index do
           |> assign(:sessions, sessions)
           |> assign(:expanded_session_ids, expanded_ids)
           |> assign(:show_new_session_modal, false)
-          |> assign(:session_form, to_form(Hudson.Sessions.Session.changeset(%Hudson.Sessions.Session{}, %{})))
+          |> assign(
+            :session_form,
+            to_form(Session.changeset(%Session{}, %{}))
+          )
           |> put_flash(:info, "Session created successfully")
 
         {:noreply, socket}
@@ -170,7 +201,10 @@ defmodule HudsonWeb.SessionsLive.Index do
           |> assign(:expanded_session_ids, expanded_ids)
           |> assign(:selected_session_for_product, nil)
           |> assign(:show_modal_for_session, nil)
-          |> assign(:product_form, to_form(Hudson.Sessions.SessionProduct.changeset(%Hudson.Sessions.SessionProduct{}, %{})))
+          |> assign(
+            :product_form,
+            to_form(SessionProduct.changeset(%SessionProduct{}, %{}))
+          )
           |> put_flash(:info, "Product added to session")
 
         {:noreply, socket}

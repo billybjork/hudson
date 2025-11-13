@@ -1,4 +1,11 @@
 defmodule Hudson.Sessions.SessionState do
+  @moduledoc """
+  Tracks the real-time state of a live session.
+
+  Stores the current product being featured, which image is displayed,
+  and the most recent message from the host. This state is synced across
+  all connected clients via PubSub.
+  """
   use Ecto.Schema
   import Ecto.Changeset
 

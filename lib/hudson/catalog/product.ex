@@ -1,4 +1,10 @@
 defmodule Hudson.Catalog.Product do
+  @moduledoc """
+  Represents a product in the catalog.
+
+  Products belong to brands and contain details like name, pricing, descriptions,
+  talking points, and associated images. Products can be featured in live sessions.
+  """
   use Ecto.Schema
   import Ecto.Changeset
 

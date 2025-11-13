@@ -1,4 +1,10 @@
 defmodule Hudson.Sessions.Session do
+  @moduledoc """
+  Represents a live streaming session for a brand.
+
+  A session is a scheduled event where products are showcased to viewers,
+  with an associated host, product lineup, and real-time state management.
+  """
   use Ecto.Schema
   import Ecto.Changeset
 

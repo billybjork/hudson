@@ -21,41 +21,45 @@ defmodule HudsonWeb.ProductsLive.Index do
 
       <div class="products-grid">
         <%= for product <- @products do %>
-          <div class="product-card">
-            <div class="product-image">
-              <%= if product.primary_image do %>
-                <img
-                  src={Media.public_image_url(product.primary_image.path)}
-                  alt={product.name}
-                  loading="lazy"
-                />
-              <% else %>
-                <div class="no-image">No Image</div>
-              <% end %>
-            </div>
-
-            <div class="product-info">
-              <div class="product-number">#<%= product.display_number %></div>
-              <h3 class="product-name"><%= product.name %></h3>
-
-              <div class="product-price">
-                <%= if product.sale_price_cents do %>
-                  <span class="original-price">$<%= Float.round(product.original_price_cents / 100, 2) %></span>
-                  <span class="sale-price">$<%= Float.round(product.sale_price_cents / 100, 2) %></span>
+          <.link navigate={~p"/products/#{product.id}/edit"} class="product-card-link">
+            <div class="product-card">
+              <div class="product-image">
+                <%= if product.primary_image do %>
+                  <img
+                    src={Media.public_image_url(product.primary_image.path)}
+                    alt={product.name}
+                    loading="lazy"
+                  />
                 <% else %>
-                  <span class="price">$<%= Float.round(product.original_price_cents / 100, 2) %></span>
+                  <div class="no-image">No Image</div>
                 <% end %>
               </div>
 
-              <%= if product.sku do %>
-                <div class="product-sku">SKU: <%= product.sku %></div>
-              <% end %>
+              <div class="product-info">
+                <div class="product-number">#{product.display_number}</div>
+                <h3 class="product-name">{product.name}</h3>
 
-              <div class="product-images-count">
-                <%= length(product.product_images) %> image(s)
+                <div class="product-price">
+                  <%= if product.sale_price_cents do %>
+                    <span class="original-price">
+                      ${Float.round(product.original_price_cents / 100, 2)}
+                    </span>
+                    <span class="sale-price">${Float.round(product.sale_price_cents / 100, 2)}</span>
+                  <% else %>
+                    <span class="price">${Float.round(product.original_price_cents / 100, 2)}</span>
+                  <% end %>
+                </div>
+
+                <%= if product.sku do %>
+                  <div class="product-sku">SKU: {product.sku}</div>
+                <% end %>
+
+                <div class="product-images-count">
+                  {length(product.product_images)} image(s)
+                </div>
               </div>
             </div>
-          </div>
+          </.link>
         <% end %>
       </div>
     </div>
@@ -100,16 +104,24 @@ defmodule HudsonWeb.ProductsLive.Index do
         gap: 1.5rem;
       }
 
+      .product-card-link {
+        text-decoration: none;
+        color: inherit;
+        display: block;
+      }
+
       .product-card {
         border: 1px solid #e5e7eb;
         border-radius: 0.5rem;
         overflow: hidden;
         background: white;
         transition: box-shadow 0.2s;
+        height: 100%;
       }
 
-      .product-card:hover {
+      .product-card-link:hover .product-card {
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        cursor: pointer;
       }
 
       .product-image {

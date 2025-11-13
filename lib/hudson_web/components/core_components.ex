@@ -22,6 +22,7 @@ defmodule HudsonWeb.CoreComponents do
   use Phoenix.Component
   use Gettext, backend: HudsonWeb.Gettext
 
+  alias Phoenix.HTML.{Form, FormField}
   alias Phoenix.LiveView.JS
 
   @doc """
@@ -93,38 +94,12 @@ defmodule HudsonWeb.CoreComponents do
 
   def button(%{rest: rest} = assigns) do
     # Build class list from attributes
-    classes = ["button"]
-
-    # Add variant class
     classes =
-      case assigns[:variant] do
-        "primary" -> classes ++ ["button--primary"]
-        "success" -> classes ++ ["button--success"]
-        "warning" -> classes ++ ["button--warning"]
-        "error" -> classes ++ ["button--error"]
-        "ghost" -> classes ++ ["button--ghost"]
-        "outline" -> classes ++ ["button--outline"]
-        "outline-error" -> classes ++ ["button--outline-error"]
-        nil -> classes
-        _ -> classes
-      end
-
-    # Add size class
-    classes =
-      case assigns[:size] do
-        "xs" -> classes ++ ["button--xs"]
-        "sm" -> classes ++ ["button--sm"]
-        "lg" -> classes ++ ["button--lg"]
-        nil -> classes
-        _ -> classes
-      end
-
-    # Add shape classes
-    classes = if assigns[:circle], do: classes ++ ["button--circle"], else: classes
-    classes = if assigns[:square], do: classes ++ ["button--square"], else: classes
-
-    # Add custom classes
-    classes = if assigns[:class], do: classes ++ [assigns[:class]], else: classes
+      ["button"]
+      |> add_variant_class(assigns[:variant])
+      |> add_size_class(assigns[:size])
+      |> add_shape_classes(assigns[:circle], assigns[:square])
+      |> add_custom_class(assigns[:class])
 
     assigns = assign(assigns, :computed_class, Enum.join(classes, " "))
 
@@ -146,7 +121,7 @@ defmodule HudsonWeb.CoreComponents do
   @doc """
   Renders an input with label and error messages.
 
-  A `Phoenix.HTML.FormField` may be passed as argument,
+  A `FormField` may be passed as argument,
   which is used to retrieve the input name, id, and values.
   Otherwise all attributes may be passed explicitly.
 
@@ -179,13 +154,13 @@ defmodule HudsonWeb.CoreComponents do
     values: ~w(checkbox color date datetime-local email file month number password
                search select tel text textarea time url week)
 
-  attr :field, Phoenix.HTML.FormField,
+  attr :field, FormField,
     doc: "a form field struct retrieved from the form, for example: @form[:email]"
 
   attr :errors, :list, default: []
   attr :checked, :boolean, doc: "the checked flag for checkbox inputs"
   attr :prompt, :string, default: nil, doc: "the prompt for select inputs"
-  attr :options, :list, doc: "the options to pass to Phoenix.HTML.Form.options_for_select/2"
+  attr :options, :list, doc: "the options to pass to Form.options_for_select/2"
   attr :multiple, :boolean, default: false, doc: "the multiple flag for select inputs"
   attr :class, :string, default: nil, doc: "the input class to use over defaults"
   attr :error_class, :string, default: nil, doc: "the input error class to use over defaults"
@@ -194,7 +169,7 @@ defmodule HudsonWeb.CoreComponents do
     include: ~w(accept autocomplete capture cols disabled form list max maxlength min minlength
                 multiple pattern placeholder readonly required rows size step)
 
-  def input(%{field: %Phoenix.HTML.FormField{} = field} = assigns) do
+  def input(%{field: %FormField{} = field} = assigns) do
     errors = if Phoenix.Component.used_input?(field), do: field.errors, else: []
 
     assigns
@@ -208,7 +183,7 @@ defmodule HudsonWeb.CoreComponents do
   def input(%{type: "checkbox"} = assigns) do
     assigns =
       assign_new(assigns, :checked, fn ->
-        Phoenix.HTML.Form.normalize_value("checkbox", assigns[:value])
+        Form.normalize_value("checkbox", assigns[:value])
       end)
 
     ~H"""
@@ -245,7 +220,7 @@ defmodule HudsonWeb.CoreComponents do
           {@rest}
         >
           <option :if={@prompt} value="">{@prompt}</option>
-          {Phoenix.HTML.Form.options_for_select(@options, @value)}
+          {Form.options_for_select(@options, @value)}
         </select>
       </label>
       <.error :for={msg <- @errors}>{msg}</.error>
@@ -266,7 +241,7 @@ defmodule HudsonWeb.CoreComponents do
             @errors != [] && (@error_class || "textarea--error")
           ]}
           {@rest}
-        >{Phoenix.HTML.Form.normalize_value("textarea", @value)}</textarea>
+        >{Form.normalize_value("textarea", @value)}</textarea>
       </label>
       <.error :for={msg <- @errors}>{msg}</.error>
     </div>
@@ -283,7 +258,7 @@ defmodule HudsonWeb.CoreComponents do
           type={@type}
           name={@name}
           id={@id}
-          value={Phoenix.HTML.Form.normalize_value(@type, @value)}
+          value={Form.normalize_value(@type, @value)}
           class={[
             @class || "input",
             @errors != [] && (@error_class || "input--error")
@@ -449,89 +424,155 @@ defmodule HudsonWeb.CoreComponents do
   end
 
   @doc """
-  Renders a modal dialog using native dialog element.
+  Renders a modal dialog.
 
-  ## Examples
+  ## Usage Pattern
 
-      <.modal id="new-session-modal">
-        <div class="modal__header">
-          <h2 class="modal__title">New Session</h2>
-        </div>
-        <div class="modal__body">
-          <p>Modal content goes here</p>
-        </div>
-      </.modal>
+  **Always use conditional rendering** around the modal component. The modal will automatically
+  show when mounted (via `phx-mounted`) and hide when unmounted.
 
-      <!-- Trigger with JS -->
-      <button phx-click={show_modal("new-session-modal")}>Open Modal</button>
+  ### Example 1: Simple Modal
+
+      <!-- In your template -->
+      <%= if @show_new_session_modal do %>
+        <.modal id="new-session-modal" show={true} on_cancel={JS.push("close_modal")}>
+          <div class="modal__header">
+            <h2 class="modal__title">New Session</h2>
+          </div>
+          <div class="modal__body">
+            <.form for={@form} phx-submit="save">
+              <!-- form fields -->
+            </.form>
+          </div>
+        </.modal>
+      <% end %>
+
+      <!-- Trigger button -->
+      <.button phx-click="show_new_session_modal">New Session</.button>
+
+      # In your LiveView:
+      def handle_event("show_new_session_modal", _params, socket) do
+        {:noreply, assign(socket, :show_new_session_modal, true)}
+      end
+
+      def handle_event("close_modal", _params, socket) do
+        {:noreply, assign(socket, :show_new_session_modal, false)}
+      end
+
+  ### Example 2: Modal with Server Data Loading
+
+      <!-- In your template -->
+      <%= if @selected_product do %>
+        <.modal id="edit-product-modal" show={true} on_cancel={JS.push("close_product_modal")}>
+          <div class="modal__header">
+            <h2 class="modal__title">Edit Product</h2>
+          </div>
+          <div class="modal__body">
+            <.form for={@product_form} phx-submit="save_product">
+              <!-- form fields using @selected_product -->
+            </.form>
+          </div>
+        </.modal>
+      <% end %>
+
+      <!-- Trigger button -->
+      <.button phx-click="load_product" phx-value-id={product.id}>Edit</.button>
+
+      # In your LiveView:
+      def handle_event("load_product", %{"id" => id}, socket) do
+        product = Products.get_product!(id)
+        {:noreply, assign(socket, :selected_product, product)}
+      end
+
+      def handle_event("close_product_modal", _params, socket) do
+        {:noreply, assign(socket, :selected_product, nil)}
+      end
+
+  ## Important Notes
+
+  - **Always wrap modals in conditional rendering** (`<%= if @condition do %>`)
+  - Set `show={true}` on the modal component
+  - The modal auto-shows when the condition becomes true (component mounts)
+  - The modal auto-hides when the condition becomes false (component unmounts)
+  - The `on_cancel` attribute handles cleanup when modal closes via backdrop, Escape, or X button
+  - Form validation events (like dropdowns) work correctly with this pattern
   """
   attr :id, :string, required: true
   attr :show, :boolean, default: false
   attr :on_cancel, JS, default: %JS{}
+  attr :rest, :global, doc: "arbitrary HTML attributes to add to the modal container"
   slot :inner_block, required: true
 
   def modal(assigns) do
     ~H"""
-    <dialog
+    <div
       id={@id}
-      class="modal"
-      phx-hook="Modal"
-      data-show={to_string(@show)}
+      phx-mounted={@show && show_modal(@id)}
       phx-remove={hide_modal(@id)}
+      data-cancel={JS.exec(@on_cancel, "phx-remove")}
+      class="modal modal--hidden"
+      {@rest}
     >
-      <div class="modal__box">
-        <button
-          type="button"
-          phx-click={JS.exec(@on_cancel, "data-cancel") |> hide_modal(@id)}
-          class="modal__close"
-          aria-label={gettext("close")}
-        >
-          ✕
-        </button>
-        {render_slot(@inner_block)}
+      <div id={"#{@id}-bg"} class="modal__backdrop" aria-hidden="true" />
+      <div
+        class="modal__container"
+        aria-labelledby={"#{@id}-title"}
+        role="dialog"
+        aria-modal="true"
+        tabindex="0"
+      >
+        <div class="modal__centering">
+          <.focus_wrap
+            id={"#{@id}-container"}
+            phx-window-keydown={JS.exec("data-cancel", to: "##{@id}")}
+            phx-key="escape"
+            phx-click-away={JS.exec("data-cancel", to: "##{@id}")}
+            class="modal__box"
+          >
+            <button
+              type="button"
+              phx-click={JS.exec("data-cancel", to: "##{@id}")}
+              class="modal__close"
+              aria-label={gettext("close")}
+            >
+              ✕
+            </button>
+            {render_slot(@inner_block)}
+          </.focus_wrap>
+        </div>
       </div>
-      <form method="dialog" class="modal-backdrop">
-        <button phx-click={JS.exec(@on_cancel, "data-cancel") |> hide_modal(@id)}>close</button>
-      </form>
-    </dialog>
+    </div>
     """
   end
 
   ## JS Commands
 
   def show(js \\ %JS{}, selector) do
-    JS.show(js,
-      to: selector,
-      time: 300,
-      transition:
-        {"transition-all ease-out duration-300",
-         "opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95",
-         "opacity-100 translate-y-0 sm:scale-100"}
-    )
+    JS.show(js, to: selector, time: 300)
   end
 
   def hide(js \\ %JS{}, selector) do
-    JS.hide(js,
-      to: selector,
-      time: 200,
-      transition:
-        {"transition-all ease-in duration-200", "opacity-100 translate-y-0 sm:scale-100",
-         "opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"}
-    )
+    JS.hide(js, to: selector, time: 200)
   end
 
   @doc """
-  Shows a modal dialog by dispatching a modal:show event.
+  Shows a modal dialog.
   """
   def show_modal(js \\ %JS{}, id) when is_binary(id) do
-    JS.dispatch(js, "modal:show", to: "##{id}", detail: %{id: id})
+    js
+    |> JS.remove_class("modal--hidden", to: "##{id}")
+    |> JS.add_class("overflow-hidden", to: "body")
+    |> JS.focus_first(to: "##{id}-container")
   end
 
   @doc """
-  Hides a modal dialog by dispatching a modal:hide event.
+  Hides a modal dialog.
   """
   def hide_modal(js \\ %JS{}, id) when is_binary(id) do
-    JS.dispatch(js, "modal:hide", to: "##{id}", detail: %{id: id})
+    js
+    |> JS.add_class("modal--hidden", to: "##{id}")
+    |> JS.remove_class("overflow-hidden", to: "body")
+    |> JS.pop_focus()
   end
 
   @doc """
@@ -561,4 +602,52 @@ defmodule HudsonWeb.CoreComponents do
   def translate_errors(errors, field) when is_list(errors) do
     for {^field, {msg, opts}} <- errors, do: translate_error({msg, opts})
   end
+
+  # Button helper functions
+
+  @button_variants %{
+    "primary" => "button--primary",
+    "success" => "button--success",
+    "warning" => "button--warning",
+    "error" => "button--error",
+    "ghost" => "button--ghost",
+    "outline" => "button--outline",
+    "outline-error" => "button--outline-error"
+  }
+
+  @button_sizes %{
+    "xs" => "button--xs",
+    "sm" => "button--sm",
+    "lg" => "button--lg"
+  }
+
+  defp add_variant_class(classes, variant) when is_binary(variant) do
+    case Map.get(@button_variants, variant) do
+      nil -> classes
+      class -> classes ++ [class]
+    end
+  end
+
+  defp add_variant_class(classes, _), do: classes
+
+  defp add_size_class(classes, size) when is_binary(size) do
+    case Map.get(@button_sizes, size) do
+      nil -> classes
+      class -> classes ++ [class]
+    end
+  end
+
+  defp add_size_class(classes, _), do: classes
+
+  defp add_shape_classes(classes, circle, square) do
+    classes
+    |> maybe_add_class(circle, "button--circle")
+    |> maybe_add_class(square, "button--square")
+  end
+
+  defp add_custom_class(classes, nil), do: classes
+  defp add_custom_class(classes, custom_class), do: classes ++ [custom_class]
+
+  defp maybe_add_class(classes, true, class_name), do: classes ++ [class_name]
+  defp maybe_add_class(classes, _, _), do: classes
 end

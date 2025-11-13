@@ -46,19 +46,19 @@ defmodule Hudson.Import do
   def read_import_data(folder_path) do
     json_path = Path.join(folder_path, "products.json")
 
-    if File.exists?(json_path) do
-      case File.read(json_path) do
-        {:ok, content} ->
-          case Jason.decode(content, keys: :atoms) do
-            {:ok, data} -> {:ok, data}
-            {:error, error} -> {:error, "Failed to parse JSON: #{inspect(error)}"}
-          end
-
-        {:error, reason} ->
-          {:error, "Failed to read file: #{inspect(reason)}"}
-      end
+    with true <- File.exists?(json_path),
+         {:ok, content} <- File.read(json_path),
+         {:ok, data} <- Jason.decode(content, keys: :atoms) do
+      {:ok, data}
     else
-      {:error, "products.json not found in #{folder_path}"}
+      false ->
+        {:error, "products.json not found in #{folder_path}"}
+
+      {:error, %Jason.DecodeError{} = error} ->
+        {:error, "Failed to parse JSON: #{inspect(error)}"}
+
+      {:error, reason} ->
+        {:error, "Failed to read file: #{inspect(reason)}"}
     end
   end
 
@@ -128,12 +128,13 @@ defmodule Hudson.Import do
         successes = Enum.count(imported, fn {status, _} -> status == :ok end)
         failures = Enum.count(imported, fn {status, _} -> status == :error end)
 
-        {:ok, %{
-          total: length(imported),
-          successes: successes,
-          failures: failures,
-          results: imported
-        }}
+        {:ok,
+         %{
+           total: length(imported),
+           successes: successes,
+           failures: failures,
+           results: imported
+         }}
 
       {:error, reason} ->
         {:error, "Transaction failed: #{inspect(reason)}"}
@@ -142,7 +143,8 @@ defmodule Hudson.Import do
 
   defp import_product(product_data, brand, images_path, update_existing) do
     # Check if product exists
-    existing = Repo.get_by(Product, display_number: product_data.display_number, brand_id: brand.id)
+    existing =
+      Repo.get_by(Product, display_number: product_data.display_number, brand_id: brand.id)
 
     cond do
       is_nil(existing) ->
@@ -181,7 +183,10 @@ defmodule Hudson.Import do
         {:ok, product}
 
       {:error, changeset} ->
-        Logger.error("Failed to create product #{product_data.display_number}: #{inspect(changeset.errors)}")
+        Logger.error(
+          "Failed to create product #{product_data.display_number}: #{inspect(changeset.errors)}"
+        )
+
         {:error, "Failed to create product: #{inspect(changeset.errors)}"}
     end
   end
@@ -209,7 +214,10 @@ defmodule Hudson.Import do
         {:ok, product}
 
       {:error, changeset} ->
-        Logger.error("Failed to update product #{product_data.display_number}: #{inspect(changeset.errors)}")
+        Logger.error(
+          "Failed to update product #{product_data.display_number}: #{inspect(changeset.errors)}"
+        )
+
         {:error, "Failed to update product: #{inspect(changeset.errors)}"}
     end
   end
@@ -217,29 +225,32 @@ defmodule Hudson.Import do
   defp upload_product_image(product, filename, images_path, position) do
     image_file_path = Path.join(images_path, filename)
 
-    if File.exists?(image_file_path) do
-      case Media.upload_product_image(image_file_path, product.id, position) do
-        {:ok, %{path: path, thumbnail_path: thumb_path}} ->
-          case Catalog.create_product_image(%{
-            product_id: product.id,
-            path: path,
-            thumbnail_path: thumb_path,
-            position: position,
-            is_primary: position == 0,
-            alt_text: "#{product.name} - Image #{position + 1}"
-          }) do
-            {:ok, _image} ->
-              Logger.info("Uploaded image for product #{product.display_number}: #{filename}")
-
-            {:error, changeset} ->
-              Logger.error("Failed to create product_image record for product #{product.display_number}: #{inspect(changeset.errors)}")
-          end
-
-        {:error, reason} ->
-          Logger.error("Failed to upload image for product #{product.display_number}: #{inspect(reason)}")
-      end
+    with true <- File.exists?(image_file_path),
+         {:ok, %{path: path, thumbnail_path: thumb_path}} <-
+           Media.upload_product_image(image_file_path, product.id, position),
+         {:ok, _image} <-
+           Catalog.create_product_image(%{
+             product_id: product.id,
+             path: path,
+             thumbnail_path: thumb_path,
+             position: position,
+             is_primary: position == 0,
+             alt_text: "#{product.name} - Image #{position + 1}"
+           }) do
+      Logger.info("Uploaded image for product #{product.display_number}: #{filename}")
     else
-      Logger.warning("Image file not found: #{image_file_path}")
+      false ->
+        Logger.warning("Image file not found: #{image_file_path}")
+
+      {:error, %Ecto.Changeset{} = changeset} ->
+        Logger.error(
+          "Failed to create product_image record for product #{product.display_number}: #{inspect(changeset.errors)}"
+        )
+
+      {:error, reason} ->
+        Logger.error(
+          "Failed to upload image for product #{product.display_number}: #{inspect(reason)}"
+        )
     end
   end
 
@@ -270,6 +281,7 @@ defmodule Hudson.Import do
         case Repo.get_by(Brand, slug: "pavoi") do
           nil ->
             Logger.info("Creating default 'Pavoi' brand...")
+
             Catalog.create_brand(%{
               name: "Pavoi",
               slug: "pavoi",

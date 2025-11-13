@@ -51,7 +51,10 @@ defmodule HudsonWeb.Layouts do
             <a href="https://github.com/phoenixframework/phoenix" class="navbar__link">GitHub</a>
           </li>
           <li>
-            <a href="https://hexdocs.pm/phoenix/overview.html" class="navbar__link navbar__link--active">
+            <a
+              href="https://hexdocs.pm/phoenix/overview.html"
+              class="navbar__link navbar__link--active"
+            >
               Get Started <span aria-hidden="true">&rarr;</span>
             </a>
           </li>

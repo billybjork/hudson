@@ -48,46 +48,280 @@
 .session-card {
   background-color: var(--color-surface-primary);
   border-radius: var(--radius-lg);
-  padding: var(--space-4);
-  cursor: pointer;
+  padding: var(--space-6);
   transition: all var(--transition-base);
   border: 1px solid var(--color-border-secondary);
+  overflow: hidden;
+  cursor: pointer;
 }
 
 .session-card:hover {
-  background-color: var(--color-bg-hover);
   border-color: var(--color-border-primary);
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-sm);
 }
 
+/* Empty state */
+.session-card__empty-state {
+  text-align: center;
+  padding: var(--space-8);
+  color: var(--color-text-secondary);
+}
+
+/* Header area - contains title group and actions */
 .session-card__header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
+  gap: var(--space-6);
+}
+
+/* Title group */
+.session-card__title-group {
+  flex: 1;
+  min-width: 0; /* Allow text truncation if needed */
+}
+
+/* Title row - title and badge side by side */
+.session-card__title-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
   margin-bottom: var(--space-3);
 }
 
 .session-card__title {
-  font-size: var(--text-lg);
+  font-size: var(--text-xl);
   font-weight: var(--font-semibold);
-  margin-bottom: var(--space-2);
+  color: var(--color-text-primary);
+  margin: 0;
 }
 
+/* Meta information - horizontal layout */
 .session-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin-bottom: var(--space-3);
+}
+
+.session-card__meta-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
   font-size: var(--text-sm);
   color: var(--color-text-secondary);
 }
 
-.session-card__products {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
-  gap: var(--space-3);
-  margin-top: var(--space-4);
+.session-card__notes {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  margin-top: var(--space-2);
+  line-height: 1.5;
 }
 
+/* Actions - buttons on the right */
 .session-card__actions {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--space-2);
-  margin-top: var(--space-4);
+  align-items: flex-start;
+  flex-shrink: 0;
+  cursor: default; /* Override card's pointer cursor for button area */
+}
+
+/* Details wrapper - uses CSS Grid for smooth expand/collapse */
+.session-card__details-wrapper {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition: grid-template-rows 0.2s ease-out, opacity 0.15s ease-out 0.05s;
+  overflow: hidden;
+}
+
+.session-card__details-wrapper--expanded {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transition: grid-template-rows 0.2s ease-out, opacity 0.15s ease-out;
+}
+
+/* Expanded details section */
+.session-card__details {
+  min-height: 0;
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 1px solid transparent;
+  transition: margin-top 0.2s ease-out, padding-top 0.2s ease-out, border-color 0.2s ease-out;
+}
+
+/* Add spacing and border when expanded */
+.session-card__details-wrapper--expanded .session-card__details {
+  margin-top: var(--space-6);
+  padding-top: var(--space-6);
+  border-top-color: var(--color-border-secondary);
+}
+
+/* Animation keyframes for staggered product appearance */
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.session-card__details-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-4);
+}
+
+.session-card__details-title {
+  font-size: var(--text-lg);
+  font-weight: var(--font-semibold);
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+/* Collapse button */
+.session-card__collapse-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  background-color: var(--color-surface-primary);
+  border: 1px solid var(--color-border-secondary);
+  border-radius: var(--radius-md);
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  cursor: pointer;
+  transition: all var(--transition-base);
+  flex-shrink: 0;
+}
+
+.session-card__collapse-btn:hover {
+  background-color: var(--color-bg-hover);
+  border-color: var(--color-border-primary);
+  color: var(--color-text-primary);
+}
+
+.session-card__collapse-btn:active {
+  transform: translateY(1px);
+}
+
+/* Product list - grid layout for cards */
+.session-card__product-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: var(--space-4);
+}
+
+/* Product item - horizontal card layout */
+.session-card__product-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background-color: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-secondary);
+  border-radius: var(--radius-md);
+  transition: all var(--transition-base);
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+/* Product link - wraps clickable product content */
+.session-card__product-link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex: 1;
+  min-width: 0; /* Allow text truncation */
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+/* Animate products only when parent is expanded */
+.session-card__details-wrapper--expanded .session-card__product-item {
+  animation: fadeInUp 0.3s ease-out forwards;
+}
+
+/* Stagger animation for product items */
+.session-card__details-wrapper--expanded .session-card__product-item:nth-child(1) { animation-delay: 0.05s; }
+.session-card__details-wrapper--expanded .session-card__product-item:nth-child(2) { animation-delay: 0.1s; }
+.session-card__details-wrapper--expanded .session-card__product-item:nth-child(3) { animation-delay: 0.15s; }
+.session-card__details-wrapper--expanded .session-card__product-item:nth-child(4) { animation-delay: 0.2s; }
+.session-card__details-wrapper--expanded .session-card__product-item:nth-child(5) { animation-delay: 0.25s; }
+.session-card__details-wrapper--expanded .session-card__product-item:nth-child(n+6) { animation-delay: 0.3s; }
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.session-card__product-item:hover {
+  border-color: var(--color-border-primary);
+  background-color: var(--color-bg-hover);
+}
+
+.session-card__product-position {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background-color: var(--color-surface-primary);
+  border: 1px solid var(--color-border-primary);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  color: var(--color-text-secondary);
+  flex-shrink: 0;
+}
+
+.session-card__product-image {
+  width: 64px;
+  height: 64px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+  background-color: var(--color-bg-primary);
+}
+
+.session-card__product-name {
+  flex: 1;
+  font-size: var(--text-base);
+  font-weight: var(--font-medium);
+  color: var(--color-text-primary);
+  margin: 0;
+  line-height: 1.4;
+  min-width: 0; /* Allow text truncation */
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .session-card__header {
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+
+  .session-card__actions {
+    width: 100%;
+  }
+
+  .session-card__product-list {
+    grid-template-columns: 1fr;
+  }
 }

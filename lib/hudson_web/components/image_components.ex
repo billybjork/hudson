@@ -43,10 +43,10 @@ defmodule HudsonWeb.ImageComponents do
   def lqip_image(assigns) do
     ~H"""
     <div class={"lqip-container #{@class}"}>
-      <!-- Skeleton loader (shown while thumbnail loads) -->
+      <%!-- Skeleton loader (shown while thumbnail loads) --%>
       <div id={"skeleton-#{@id}"} class="lqip-skeleton" />
 
-      <!-- Low-quality placeholder (blurred thumbnail) -->
+      <%!-- Low-quality placeholder (blurred thumbnail) --%>
       <img
         id={"placeholder-#{@id}"}
         class="lqip-placeholder"
@@ -55,7 +55,7 @@ defmodule HudsonWeb.ImageComponents do
         aria-hidden="true"
       />
 
-      <!-- High-quality image (main image) -->
+      <%!-- High-quality image (main image) --%>
       <img
         id={@id}
         class="lqip-image"

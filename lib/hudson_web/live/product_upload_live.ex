@@ -55,28 +55,7 @@ defmodule HudsonWeb.ProductUploadLive do
             {_matched_entry, position} =
               Enum.find(entries_with_positions, fn {e, _pos} -> e.ref == entry.ref end)
 
-            case Media.upload_product_image(path, product_id, position) do
-              {:ok, %{path: img_path, thumbnail_path: thumb_path}} ->
-                # Create product_image record
-                case Catalog.create_product_image(%{
-                       product_id: product_id,
-                       path: img_path,
-                       thumbnail_path: thumb_path,
-                       position: position,
-                       is_primary: position == 0,
-                       alt_text: "#{entry.client_name}"
-                     }) do
-                  {:ok, product_image} ->
-                    {:ok, %{success: true, filename: entry.client_name, image: product_image}}
-
-                  {:error, _changeset} ->
-                    {:postpone,
-                     %{success: false, filename: entry.client_name, error: "Failed to create DB record"}}
-                end
-
-              {:error, reason} ->
-                {:postpone, %{success: false, filename: entry.client_name, error: reason}}
-            end
+            process_image_upload(path, product_id, position, entry)
           end)
 
         socket
@@ -355,4 +334,27 @@ defmodule HudsonWeb.ProductUploadLive do
   defp error_to_string(:not_accepted), do: "File type not accepted (only JPG, PNG)"
   defp error_to_string(:too_many_files), do: "Too many files (max 5)"
   defp error_to_string(err), do: "Upload error: #{inspect(err)}"
+
+  defp process_image_upload(path, product_id, position, entry) do
+    with {:ok, %{path: img_path, thumbnail_path: thumb_path}} <-
+           Media.upload_product_image(path, product_id, position),
+         {:ok, product_image} <-
+           Catalog.create_product_image(%{
+             product_id: product_id,
+             path: img_path,
+             thumbnail_path: thumb_path,
+             position: position,
+             is_primary: position == 0,
+             alt_text: "#{entry.client_name}"
+           }) do
+      {:ok, %{success: true, filename: entry.client_name, image: product_image}}
+    else
+      {:error, %Ecto.Changeset{}} ->
+        {:postpone,
+         %{success: false, filename: entry.client_name, error: "Failed to create DB record"}}
+
+      {:error, reason} ->
+        {:postpone, %{success: false, filename: entry.client_name, error: reason}}
+    end
+  end
 end

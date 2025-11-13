@@ -179,28 +179,4 @@ Hooks.ImageLoadingState = {
   }
 }
 
-/**
- * Modal Hook
- * Handles opening/closing modals based on data-show attribute
- */
-Hooks.Modal = {
-  mounted() {
-    this.handleShowChange()
-  },
-
-  updated() {
-    this.handleShowChange()
-  },
-
-  handleShowChange() {
-    const show = this.el.dataset.show === 'true'
-
-    if (show) {
-      this.el.showModal()
-    } else if (this.el.open) {
-      this.el.close()
-    }
-  }
-}
-
 export default Hooks

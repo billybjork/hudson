@@ -10,8 +10,8 @@
       </div>
     </div>
   <% end %>
-
-  <!-- Header -->
+  
+<!-- Header -->
   <header class="session-header">
     <div class="session-title">{@session.name}</div>
     <div class="session-info">
@@ -20,13 +20,10 @@
           Product {@current_position} / {@total_products}
         </div>
       <% end %>
-      <div id="connection-status" phx-hook="ConnectionStatus" class="connection-status">
-        <span class="connected">● Connected</span>
-      </div>
     </div>
   </header>
-
-  <!-- Main Content -->
+  
+<!-- Main Content -->
   <%= if @current_session_product && @current_product do %>
     <div class="session-main">
       <!-- Left: Product Image -->
@@ -57,8 +54,8 @@
           <div class="no-images">No images available</div>
         <% end %>
       </div>
-
-      <!-- Right: Product Info & Talking Points -->
+      
+<!-- Right: Product Info & Talking Points -->
       <div class="product-details">
         <!-- Product Header -->
         <div class="product-header">
@@ -94,8 +91,8 @@
             <% end %>
           </div>
         </div>
-
-        <!-- Talking Points -->
+        
+<!-- Talking Points -->
         <div class="talking-points">
           <%= if @talking_points_html do %>
             {@talking_points_html}

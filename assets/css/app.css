@@ -23,7 +23,9 @@
 
 /* Layouts Layer - Composition patterns */
 @import "./04-layouts/compositions.css";
-@import "./04-layouts/session.css";
+@import "./04-layouts/session-index.css";
+@import "./04-layouts/session-host.css";
+@import "./04-layouts/session-producer.css";
 
 /* Components Layer - UI components */
 @import "./05-components/button.css";

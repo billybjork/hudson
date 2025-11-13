@@ -54,3 +54,5 @@ small {
 
 .text-secondary { color: var(--color-text-secondary); }
 .text-tertiary { color: var(--color-text-tertiary); }
+.text-error { color: var(--color-accent-red); }
+.text-success { color: var(--color-accent-green); }

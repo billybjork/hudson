@@ -1,5 +1,6 @@
 /* ============================================================================
-   SESSION-SPECIFIC LAYOUTS
+   SESSION INDEX LAYOUT
+   Base layout for the sessions list page
    ============================================================================ */
 
 .session-layout {
@@ -15,14 +16,22 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: var(--space-6);
+  padding: var(--space-4) var(--space-6);
   background-color: var(--color-surface-primary);
   border-radius: var(--radius-lg);
+  gap: var(--space-4);
 }
 
-.session-main {
+.session-title {
+  font-size: var(--text-2xl);
+  font-weight: var(--font-bold);
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.session-info {
   display: flex;
-  flex-direction: column;
+  align-items: center;
   gap: var(--space-6);
 }
 
@@ -41,6 +50,7 @@
   gap: var(--space-4);
 }
 
+/* Responsive adjustments */
 @media (min-width: 768px) {
   .session-layout {
     grid-template-columns: 300px 1fr;

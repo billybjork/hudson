@@ -1,4 +1,10 @@
 defmodule Hudson.Catalog.ProductImage do
+  @moduledoc """
+  Represents an image associated with a product.
+
+  Products can have multiple images in a specific order. Images include
+  both full-size and thumbnail versions stored in Supabase Storage.
+  """
   use Ecto.Schema
   import Ecto.Changeset
 

@@ -80,7 +80,9 @@ defmodule Hudson.Catalog do
     |> preload(:product_images)
     |> Repo.all()
     |> Enum.map(fn product ->
-      primary_image = Enum.find(product.product_images, & &1.is_primary) || List.first(product.product_images)
+      primary_image =
+        Enum.find(product.product_images, & &1.is_primary) || List.first(product.product_images)
+
       Map.put(product, :primary_image, primary_image)
     end)
   end
@@ -96,7 +98,9 @@ defmodule Hudson.Catalog do
     |> preload(:product_images)
     |> Repo.all()
     |> Enum.map(fn product ->
-      primary_image = Enum.find(product.product_images, & &1.is_primary) || List.first(product.product_images)
+      primary_image =
+        Enum.find(product.product_images, & &1.is_primary) || List.first(product.product_images)
+
       Map.put(product, :primary_image, primary_image)
     end)
   end

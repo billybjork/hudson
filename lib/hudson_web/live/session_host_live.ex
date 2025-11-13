@@ -40,20 +40,9 @@ defmodule HudsonWeb.SessionHostLive do
         socket
       end
 
-    # Set temporary assigns for memory management if connected
-    if connected?(socket) do
-      {:ok, socket,
-       temporary_assigns: [
-         current_session_product: nil,
-         current_product: nil,
-         talking_points_html: nil,
-         product_images: [],
-         host_message: nil
-       ]}
-    else
-      # Minimal work during HTTP mount
-      {:ok, socket}
-    end
+    # Note: Not using temporary_assigns for product display data
+    # because it needs to persist across renders for the UI to work correctly
+    {:ok, socket}
   end
 
   @impl true
@@ -120,13 +109,16 @@ defmodule HudsonWeb.SessionHostLive do
 
     # Calculate display position (1-based index in sorted list)
     session = socket.assigns.session
+
     display_position =
       session.session_products
       |> Enum.sort_by(& &1.position)
       |> Enum.find_index(&(&1.id == session_product_id))
       |> case do
-        nil -> session_product.position  # Fallback to raw position
-        index -> index + 1  # Convert to 1-based
+        # Fallback to raw position
+        nil -> session_product.position
+        # Convert to 1-based
+        index -> index + 1
       end
 
     assign(socket,

@@ -77,7 +77,9 @@ defmodule Hudson.MixProject do
       # Load .env files in development
       {:dotenvy, "~> 0.8.0", only: [:dev, :test]},
       # Static type analysis
-      {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false}
+      {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
+      # Static code analysis
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false}
     ]
   end
 
@@ -104,6 +106,7 @@ defmodule Hudson.MixProject do
         "deps.unlock --unused",
         "format",
         "test",
+        "credo --strict",
         "dialyzer"
       ]
     ]

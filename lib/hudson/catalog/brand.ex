@@ -1,4 +1,9 @@
 defmodule Hudson.Catalog.Brand do
+  @moduledoc """
+  Represents a brand in the system.
+
+  Brands own products and sessions. Each brand has a unique slug for URL routing.
+  """
   use Ecto.Schema
   import Ecto.Changeset
 

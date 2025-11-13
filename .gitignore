@@ -44,3 +44,6 @@ erl_crash.dump
 .env
 .env.local
 .env.*.local
+
+# Misc / Temporary projects
+red-hot-xtra/

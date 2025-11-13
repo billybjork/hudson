@@ -6,8 +6,8 @@ defmodule Hudson.Sessions do
   import Ecto.Query, warn: false
   alias Hudson.Repo
 
-  alias Hudson.Sessions.{Session, SessionProduct, SessionState}
   alias Hudson.Catalog.ProductImage
+  alias Hudson.Sessions.{Session, SessionProduct, SessionState}
 
   ## Sessions
 
@@ -322,15 +322,17 @@ defmodule Hudson.Sessions do
     Repo.transaction(fn ->
       session_products
       |> Enum.with_index(1)
-      |> Enum.each(fn {sp, new_position} ->
-        if sp.position != new_position do
-          sp
-          |> Ecto.Changeset.change(position: new_position)
-          |> Repo.update!()
-        end
-      end)
+      |> Enum.each(&update_session_product_position/1)
     end)
   end
+
+  defp update_session_product_position({sp, new_position}) when sp.position != new_position do
+    sp
+    |> Ecto.Changeset.change(position: new_position)
+    |> Repo.update!()
+  end
+
+  defp update_session_product_position(_), do: :ok
 
   ## Private Helpers
 
