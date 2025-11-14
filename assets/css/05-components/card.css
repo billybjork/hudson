@@ -310,20 +310,6 @@
   min-width: 0; /* Allow text truncation */
 }
 
-/* Ensure remove button is clickable and visible */
-.session-card__product-item .button {
-  position: relative;
-  z-index: 1;
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  font-size: 1.5rem;
-  line-height: 1;
-}
-
 /* Add product button */
 .session-card__add-product-btn {
   display: flex;
@@ -353,6 +339,36 @@
 .session-card__details-wrapper--expanded .session-card__add-product-btn {
   animation: fadeInUp 0.3s ease-out forwards;
   animation-delay: 0.35s;
+}
+
+/* Product actions - buttons on the right */
+.session-card__product-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.session-card__product-actions .button {
+  position: relative;
+  z-index: 1;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+/* Spacer for product actions alignment */
+.session-card__product-spacer {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
 }
 
 /* Responsive adjustments */

@@ -104,6 +104,7 @@ defmodule HudsonWeb.SessionsLive.Index do
       |> assign(:selected_product_ids, MapSet.new())
       |> assign(:new_session_has_more, false)
       |> assign(:loading_products, false)
+      |> assign(:new_session_products_map, %{})
       |> stream(:new_session_products, [])
       |> assign(:add_product_search_query, "")
       |> assign(:add_product_page, 1)
@@ -111,6 +112,7 @@ defmodule HudsonWeb.SessionsLive.Index do
       |> assign(:add_product_selected_ids, MapSet.new())
       |> assign(:add_product_has_more, false)
       |> assign(:loading_add_products, false)
+      |> assign(:add_product_products_map, %{})
       |> stream(:add_product_products, [])
 
     {:ok, socket}
@@ -378,7 +380,23 @@ defmodule HudsonWeb.SessionsLive.Index do
         MapSet.put(selected_ids, product_id)
       end
 
-    {:noreply, assign(socket, :add_product_selected_ids, new_selected_ids)}
+    # Find the product in the map and update it with the new selected state
+    product = find_product_in_stream(socket.assigns.add_product_products_map, product_id)
+
+    socket =
+      socket
+      |> assign(:add_product_selected_ids, new_selected_ids)
+
+    # Update the product in the stream with the new selected state
+    socket =
+      if product do
+        updated_product = Map.put(product, :selected, MapSet.member?(new_selected_ids, product_id))
+        stream_insert(socket, :add_product_products, updated_product)
+      else
+        socket
+      end
+
+    {:noreply, socket}
   end
 
   @impl true
@@ -411,7 +429,14 @@ defmodule HudsonWeb.SessionsLive.Index do
     end
   end
 
-  @impl true
+  def handle_event("move_product_up", %{"session-product-id" => sp_id}, socket) do
+    move_product(socket, sp_id, :up)
+  end
+
+  def handle_event("move_product_down", %{"session-product-id" => sp_id}, socket) do
+    move_product(socket, sp_id, :down)
+  end
+
   def handle_event("delete_session", %{"session-id" => session_id}, socket) do
     session_id = normalize_id(session_id)
     session = Sessions.get_session!(session_id)
@@ -600,10 +625,71 @@ defmodule HudsonWeb.SessionsLive.Index do
         MapSet.put(selected_ids, product_id)
       end
 
-    {:noreply, assign(socket, :selected_product_ids, new_selected_ids)}
+    # Find the product in the map and update it with the new selected state
+    product = find_product_in_stream(socket.assigns.new_session_products_map, product_id)
+
+    socket =
+      socket
+      |> assign(:selected_product_ids, new_selected_ids)
+
+    # Update the product in the stream with the new selected state
+    socket =
+      if product do
+        updated_product = Map.put(product, :selected, MapSet.member?(new_selected_ids, product_id))
+        stream_insert(socket, :new_session_products, updated_product)
+      else
+        socket
+      end
+
+    {:noreply, socket}
   end
 
   # Helper functions
+
+  defp move_product(socket, sp_id, direction) do
+    sp_id = normalize_id(sp_id)
+    session = find_session_for_product(socket.assigns.sessions, sp_id)
+
+    case session do
+      nil ->
+        socket
+        |> put_flash(:error, "Session not found")
+        |> then(&{:noreply, &1})
+
+      session ->
+        perform_product_swap(socket, sp_id, session, direction)
+    end
+  end
+
+  defp perform_product_swap(socket, sp_id, session, direction) do
+    case find_adjacent_product(session.session_products, sp_id, direction) do
+      nil ->
+        {:noreply, socket}
+
+      adjacent_sp ->
+        execute_product_swap(socket, sp_id, adjacent_sp.id)
+    end
+  end
+
+  defp execute_product_swap(socket, sp_id, adjacent_sp_id) do
+    case Sessions.swap_product_positions(sp_id, adjacent_sp_id) do
+      {:ok, _} ->
+        expanded_ids = socket.assigns.expanded_session_ids
+        sessions = Sessions.list_sessions_with_details()
+
+        socket =
+          socket
+          |> assign(:sessions, sessions)
+          |> assign(:expanded_session_ids, expanded_ids)
+
+        {:noreply, socket}
+
+      {:error, reason} ->
+        socket
+        |> put_flash(:error, "Failed to move product: #{inspect(reason)}")
+        |> then(&{:noreply, &1})
+    end
+  end
 
   defp load_products_for_new_session(socket, opts \\ [append: false]) do
     append = Keyword.get(opts, :append, false)
@@ -639,21 +725,34 @@ defmodule HudsonWeb.SessionsLive.Index do
               per_page: 20
             )
 
-          # Precompute primary images for all products
-          products_with_images = Enum.map(result.products, &add_primary_image/1)
+          # Precompute primary images and include selected state
+          products_with_state =
+            Enum.map(result.products, fn product ->
+              product_with_image = add_primary_image(product)
+              Map.put(product_with_image, :selected, MapSet.member?(socket.assigns.selected_product_ids, product.id))
+            end)
+
+          # Build a map for quick lookup by product ID
+          products_map =
+            if append do
+              socket.assigns.new_session_products_map
+            else
+              %{}
+            end
+            |> Map.merge(Map.new(products_with_state, &({&1.id, &1})))
 
           socket
           |> assign(:loading_products, false)
-          |> stream(:new_session_products, products_with_images, reset: !append)
+          |> assign(:new_session_products_map, products_map)
+          |> stream(:new_session_products, products_with_state, reset: !append)
           |> assign(:product_total_count, result.total)
           |> assign(:product_page, result.page)
           |> assign(:new_session_has_more, result.has_more)
         rescue
-          e ->
+          _e ->
             socket
             |> assign(:loading_products, false)
             |> put_flash(:error, "Failed to load products")
-            |> IO.inspect(label: "Product loading error: #{inspect(e)}")
         end
     end
   end
@@ -690,21 +789,27 @@ defmodule HudsonWeb.SessionsLive.Index do
         Map.put(params, field, nil)
 
       value when is_binary(value) ->
-        # If value contains decimal point, treat as dollars, otherwise as cents
-        if String.contains?(value, ".") do
-          case Float.parse(value) do
-            {dollars, _} -> Map.put(params, field, round(dollars * 100))
-            :error -> params
-          end
-        else
-          params
-        end
+        parse_price_value(params, field, value)
 
       value when is_integer(value) ->
         params
 
       _ ->
         params
+    end
+  end
+
+  defp parse_price_value(params, field, value) do
+    case String.contains?(value, ".") do
+      true -> convert_dollars_to_cents(params, field, value)
+      false -> params
+    end
+  end
+
+  defp convert_dollars_to_cents(params, field, value) do
+    case Float.parse(value) do
+      {dollars, _} -> Map.put(params, field, round(dollars * 100))
+      :error -> params
     end
   end
 
@@ -763,21 +868,34 @@ defmodule HudsonWeb.SessionsLive.Index do
               per_page: 20
             )
 
-          # Precompute primary images for all products
-          products_with_images = Enum.map(result.products, &add_primary_image/1)
+          # Precompute primary images and include selected state
+          products_with_state =
+            Enum.map(result.products, fn product ->
+              product_with_image = add_primary_image(product)
+              Map.put(product_with_image, :selected, MapSet.member?(socket.assigns.add_product_selected_ids, product.id))
+            end)
+
+          # Build a map for quick lookup by product ID
+          products_map =
+            if append do
+              socket.assigns.add_product_products_map
+            else
+              %{}
+            end
+            |> Map.merge(Map.new(products_with_state, &({&1.id, &1})))
 
           socket
           |> assign(:loading_add_products, false)
-          |> stream(:add_product_products, products_with_images, reset: !append)
+          |> assign(:add_product_products_map, products_map)
+          |> stream(:add_product_products, products_with_state, reset: !append)
           |> assign(:add_product_total_count, result.total)
           |> assign(:add_product_page, result.page)
           |> assign(:add_product_has_more, result.has_more)
         rescue
-          e ->
+          _e ->
             socket
             |> assign(:loading_add_products, false)
             |> put_flash(:error, "Failed to load products")
-            |> IO.inspect(label: "Product loading error: #{inspect(e)}")
         end
     end
   end
@@ -810,6 +928,28 @@ defmodule HudsonWeb.SessionsLive.Index do
 
       {:error, error}
     end
+  end
+
+  defp find_session_for_product(sessions, session_product_id) do
+    Enum.find(sessions, fn session ->
+      Enum.any?(session.session_products, &(&1.id == session_product_id))
+    end)
+  end
+
+  defp find_adjacent_product(session_products, sp_id, direction) do
+    sp = Enum.find(session_products, &(&1.id == sp_id))
+
+    case direction do
+      :up ->
+        Enum.find(session_products, &(&1.position == sp.position - 1))
+
+      :down ->
+        Enum.find(session_products, &(&1.position == sp.position + 1))
+    end
+  end
+
+  defp find_product_in_stream(products_map, product_id) do
+    Map.get(products_map, product_id)
   end
 
   def public_image_url(path) do

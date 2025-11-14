@@ -141,11 +141,10 @@ defmodule HudsonWeb.ProductsLive.Index do
       |> assign(:product_page, result.page)
       |> assign(:products_has_more, result.has_more)
     rescue
-      e ->
+      _e ->
         socket
         |> assign(:loading_products, false)
         |> put_flash(:error, "Failed to load products")
-        |> IO.inspect(label: "Product loading error: #{inspect(e)}")
     end
   end
 
@@ -181,21 +180,27 @@ defmodule HudsonWeb.ProductsLive.Index do
         Map.put(params, field, nil)
 
       value when is_binary(value) ->
-        # If value contains decimal point, treat as dollars, otherwise as cents
-        if String.contains?(value, ".") do
-          case Float.parse(value) do
-            {dollars, _} -> Map.put(params, field, round(dollars * 100))
-            :error -> params
-          end
-        else
-          params
-        end
+        parse_price_value(params, field, value)
 
       value when is_integer(value) ->
         params
 
       _ ->
         params
+    end
+  end
+
+  defp parse_price_value(params, field, value) do
+    case String.contains?(value, ".") do
+      true -> convert_dollars_to_cents(params, field, value)
+      false -> params
+    end
+  end
+
+  defp convert_dollars_to_cents(params, field, value) do
+    case Float.parse(value) do
+      {dollars, _} -> Map.put(params, field, round(dollars * 100))
+      :error -> params
     end
   end
 

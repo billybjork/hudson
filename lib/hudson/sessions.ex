@@ -73,18 +73,11 @@ defmodule Hudson.Sessions do
   """
   def create_session_with_products(session_attrs, product_ids \\ []) do
     Repo.transaction(fn ->
-      case create_session(session_attrs) do
-        {:ok, session} ->
-          case add_products_to_session(session.id, product_ids) do
-            :ok ->
-              session
-
-            {:error, changeset} ->
-              Repo.rollback(changeset)
-          end
-
-        {:error, changeset} ->
-          Repo.rollback(changeset)
+      with {:ok, session} <- create_session(session_attrs),
+           :ok <- add_products_to_session(session.id, product_ids) do
+        session
+      else
+        {:error, changeset} -> Repo.rollback(changeset)
       end
     end)
   end
@@ -162,6 +155,7 @@ defmodule Hudson.Sessions do
 
   @doc """
   Removes a product from a session by deleting the session_product record.
+  Automatically renumbers remaining products to fill any gaps and keep positions sequential.
   Also updates the session's updated_at timestamp to mark it as recently modified.
   """
   def remove_product_from_session(session_product_id) do
@@ -173,12 +167,82 @@ defmodule Hudson.Sessions do
         result = Repo.delete(session_product)
 
         case result do
-          {:ok, _} -> touch_session(session_product.session_id)
-          error -> error
-        end
+          {:ok, _} ->
+            # Auto-renumber positions to fill gaps
+            renumber_session_products(session_product.session_id)
+            result
 
-        result
+          error ->
+            error
+        end
     end
+  end
+
+  @doc """
+  Swaps the positions of two adjacent session products and renumbers the session.
+
+  Uses a temporary position to avoid constraint violations, then renumbers all products
+  to maintain sequential positions. This ensures positions always start at 1 and have no gaps.
+
+  Returns {:ok, {product1, product2}} on success.
+  """
+  def swap_product_positions(session_product_id_1, session_product_id_2) do
+    sp1 = Repo.get(SessionProduct, session_product_id_1)
+    sp2 = Repo.get(SessionProduct, session_product_id_2)
+
+    cond do
+      is_nil(sp1) or is_nil(sp2) ->
+        {:error, :not_found}
+
+      sp1.session_id != sp2.session_id ->
+        {:error, :different_sessions}
+
+      true ->
+        Repo.transaction(fn ->
+          # Use temporary position to avoid constraint violations
+          temp_pos = 999_999
+
+          # Step 1: Move sp1 to temp position
+          sp1
+          |> Ecto.Changeset.change(position: temp_pos)
+          |> Repo.update!()
+
+          # Step 2: Move sp2 to sp1's original position
+          sp2
+          |> Ecto.Changeset.change(position: sp1.position)
+          |> Repo.update!()
+
+          # Step 3: Move sp1 from temp to sp2's original position
+          sp1
+          |> Ecto.Changeset.change(position: sp2.position)
+          |> Repo.update!()
+
+          # Renumber all products in the session to ensure sequential 1, 2, 3, etc.
+          renumber_session_products_in_transaction(sp1.session_id)
+
+          {sp1, sp2}
+        end)
+    end
+  end
+
+  # Helper to renumber products within an existing transaction
+  defp renumber_session_products_in_transaction(session_id) do
+    session_products =
+      from(sp in SessionProduct,
+        where: sp.session_id == ^session_id,
+        order_by: [asc: sp.position]
+      )
+      |> Repo.all()
+
+    session_products
+    |> Enum.with_index(1)
+    |> Enum.each(fn {sp, new_position} ->
+      if sp.position != new_position do
+        sp
+        |> Ecto.Changeset.change(position: new_position)
+        |> Repo.update!()
+      end
+    end)
   end
 
   @doc """

@@ -133,17 +133,51 @@
                         </p>
                       </div>
 
-                      <.button
-                        size="xs"
-                        variant="ghost"
-                        circle
-                        phx-click="remove_product"
-                        phx-value-session-product-id={sp.id}
-                        aria-label="Remove product"
-                        class="text-error"
-                      >
-                        ×
-                      </.button>
+                      <div class="session-card__product-actions">
+                        <%= if sp.position > 1 do %>
+                          <.button
+                            size="xs"
+                            variant="ghost"
+                            circle
+                            phx-click="move_product_up"
+                            phx-value-session-product-id={sp.id}
+                            aria-label="Move product up"
+                            title="Move up"
+                          >
+                            ↑
+                          </.button>
+                        <% else %>
+                          <div class="session-card__product-spacer"></div>
+                        <% end %>
+
+                        <%= if sp.position < length(session.session_products) do %>
+                          <.button
+                            size="xs"
+                            variant="ghost"
+                            circle
+                            phx-click="move_product_down"
+                            phx-value-session-product-id={sp.id}
+                            aria-label="Move product down"
+                            title="Move down"
+                          >
+                            ↓
+                          </.button>
+                        <% else %>
+                          <div class="session-card__product-spacer"></div>
+                        <% end %>
+
+                        <.button
+                          size="xs"
+                          variant="ghost"
+                          circle
+                          phx-click="remove_product"
+                          phx-value-session-product-id={sp.id}
+                          aria-label="Remove product"
+                          class="text-error"
+                        >
+                          ×
+                        </.button>
+                      </div>
                     </div>
                   <% end %>
                   <.button
@@ -177,22 +211,7 @@
     </div>
 
     <div class="modal__body">
-      <div class="box box--bordered stack stack--xs">
-        <p class="text-sm text-secondary">Session:</p>
-        <p class="font-semibold">{@selected_session_for_product.name}</p>
-        <p class="text-sm text-secondary">
-          Brand: {@selected_session_for_product.brand.name}
-        </p>
-      </div>
-
-      <div style="margin-top: var(--space-4);">
-        <h3 style="font-size: var(--text-lg); font-weight: var(--font-semibold); margin: 0 0 var(--space-3) 0;">
-          Select Products to Add
-          <span style="color: var(--color-text-secondary); font-weight: var(--font-normal); font-size: var(--text-base);">
-            (<%= MapSet.size(@add_product_selected_ids) %> selected)
-          </span>
-        </h3>
-        <.product_grid
+      <.product_grid
           products={@streams.add_product_products}
           mode={:select}
           search_query={@add_product_search_query}
@@ -205,7 +224,6 @@
           loading={@loading_add_products}
           is_empty={@add_product_total_count == 0}
         />
-      </div>
 
       <div class="modal__footer">
         <.button
