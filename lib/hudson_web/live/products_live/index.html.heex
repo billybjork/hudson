@@ -1,0 +1,65 @@
+<div class="products-index">
+  <div class="products-index__header">
+    <h1 class="products-index__title">Products</h1>
+    <.link navigate="/products/upload" class="button">
+      Upload Images
+    </.link>
+  </div>
+
+  <.product_grid
+    products={@streams.products}
+    mode={:browse}
+    search_query={@product_search_query}
+    has_more={@products_has_more}
+    on_product_click="show_edit_product_modal"
+    on_search="search_products"
+    on_load_more="load_more_products"
+    show_prices={true}
+    show_search={true}
+    loading={@loading_products}
+    is_empty={@product_total_count == 0}
+  />
+
+  <.product_edit_modal
+    editing_product={@editing_product}
+    product_edit_form={@product_edit_form}
+    brands={@brands}
+  />
+</div>
+
+<style>
+  .products-index {
+    padding: var(--space-6);
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  .products-index__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-6);
+  }
+
+  .products-index__title {
+    font-size: var(--text-3xl);
+    font-weight: var(--font-bold);
+    margin: 0;
+  }
+
+  .button {
+    padding: var(--space-2) var(--space-4);
+    background-color: var(--color-primary);
+    color: white;
+    border-radius: var(--radius-md);
+    text-decoration: none;
+    font-weight: var(--font-medium);
+    transition: background-color var(--transition-fast);
+    display: inline-block;
+  }
+
+  .button:hover {
+    background-color: var(--color-primary-dark);
+    opacity: 0.9;
+  }
+</style>

@@ -310,6 +310,51 @@
   min-width: 0; /* Allow text truncation */
 }
 
+/* Ensure remove button is clickable and visible */
+.session-card__product-item .button {
+  position: relative;
+  z-index: 1;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+/* Add product button */
+.session-card__add-product-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100px;
+  padding: var(--space-3);
+  background-color: var(--color-bg-secondary);
+  border: 2px dashed var(--color-border-secondary);
+  border-radius: var(--radius-md);
+  font-size: var(--text-2xl);
+  font-weight: var(--font-light);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-base);
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+.session-card__add-product-btn:hover {
+  border-color: var(--color-border-primary);
+  background-color: var(--color-bg-hover);
+  color: var(--color-text-primary);
+}
+
+/* Animate add button when parent is expanded */
+.session-card__details-wrapper--expanded .session-card__add-product-btn {
+  animation: fadeInUp 0.3s ease-out forwards;
+  animation-delay: 0.35s;
+}
+
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .session-card__header {

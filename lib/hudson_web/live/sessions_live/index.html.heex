@@ -43,10 +43,10 @@
             <div class="session-card__actions" phx-click="stop_propagation">
               <.button
                 size="sm"
-                phx-click="load_products_for_session"
+                phx-click="show_edit_session_modal"
                 phx-value-session-id={session.id}
               >
-                Add Product
+                Edit
               </.button>
 
               <a
@@ -98,6 +98,15 @@
 
               <%= if session.session_products == [] do %>
                 <p class="text-secondary text-sm">No products added yet.</p>
+                <.button
+                  size="sm"
+                  variant="ghost"
+                  phx-click="load_products_for_session"
+                  phx-value-session-id={session.id}
+                  class="session-card__add-product-btn"
+                >
+                  +
+                </.button>
               <% else %>
                 <div class="session-card__product-list">
                   <%= for sp <- session.session_products do %>
@@ -131,11 +140,21 @@
                         phx-click="remove_product"
                         phx-value-session-product-id={sp.id}
                         aria-label="Remove product"
+                        class="text-error"
                       >
-                        <.icon name="hero-x-mark" class="size-4 text-error" />
+                        ×
                       </.button>
                     </div>
                   <% end %>
+                  <.button
+                    size="sm"
+                    variant="ghost"
+                    phx-click="load_products_for_session"
+                    phx-value-session-id={session.id}
+                    class="session-card__add-product-btn"
+                  >
+                    +
+                  </.button>
                 </div>
               <% end %>
             </div>
@@ -145,12 +164,13 @@
     <% end %>
   </div>
 </div>
-<!-- Add Product Modal (single, dynamically populated) -->
+<!-- Add Product Modal -->
 <%= if @selected_session_for_product do %>
   <.modal
     id="add-product-modal"
     show={true}
     on_cancel={JS.push("close_product_modal")}
+    modal_class="modal__box--wide"
   >
     <div class="modal__header">
       <h2 class="modal__title">Add Product to Session</h2>
@@ -165,44 +185,45 @@
         </p>
       </div>
 
-      <.form
-        for={@product_form}
-        phx-change="validate_product"
-        phx-submit="save_product_to_session"
-        class="stack"
-      >
-        <input
-          type="hidden"
-          name="session_product[session_id]"
-          value={@selected_session_for_product.id}
+      <div style="margin-top: var(--space-4);">
+        <h3 style="font-size: var(--text-lg); font-weight: var(--font-semibold); margin: 0 0 var(--space-3) 0;">
+          Select Products to Add
+          <span style="color: var(--color-text-secondary); font-weight: var(--font-normal); font-size: var(--text-base);">
+            (<%= MapSet.size(@add_product_selected_ids) %> selected)
+          </span>
+        </h3>
+        <.product_grid
+          products={@streams.add_product_products}
+          mode={:select}
+          search_query={@add_product_search_query}
+          has_more={@add_product_has_more}
+          selected_ids={@add_product_selected_ids}
+          on_product_click="toggle_add_product_selection"
+          on_search="search_add_products"
+          on_load_more="load_more_add_products"
+          show_search={true}
+          loading={@loading_add_products}
+          is_empty={@add_product_total_count == 0}
         />
+      </div>
 
-        <.input
-          field={@product_form[:product_id]}
-          type="select"
-          label="Product"
-          options={
-            Enum.map(@available_products, fn p ->
-              {p.name, p.id}
-            end)
-          }
-          prompt="Select a product"
-        />
-
-        <.input field={@product_form[:position]} type="number" label="Position" />
-
-        <div class="modal__footer">
-          <.button
-            type="button"
-            phx-click={JS.push("close_product_modal") |> hide_modal("add-product-modal")}
-          >
-            Cancel
-          </.button>
-          <.button type="submit" variant="primary" phx-disable-with="Adding...">
-            Add Product
-          </.button>
-        </div>
-      </.form>
+      <div class="modal__footer">
+        <.button
+          type="button"
+          phx-click={JS.push("close_product_modal") |> hide_modal("add-product-modal")}
+        >
+          Cancel
+        </.button>
+        <.button
+          type="button"
+          variant="primary"
+          phx-click="save_products_to_session"
+          phx-disable-with="Adding..."
+          disabled={MapSet.size(@add_product_selected_ids) == 0}
+        >
+          Add <%= MapSet.size(@add_product_selected_ids) %> Product<%= if MapSet.size(@add_product_selected_ids) != 1 do %>s<% end %>
+        </.button>
+      </div>
     </div>
   </.modal>
 <% end %>
@@ -250,80 +271,26 @@
 
         <!-- Product Selection Section -->
         <%= if @session_form.params["brand_id"] && @session_form.params["brand_id"] != "" do %>
-          <div class="product-selection">
-            <div class="product-selection__header">
-              <h3 class="product-selection__title">
-                Select Products
-                <span class="product-selection__count">
-                  (<%= MapSet.size(@selected_product_ids) %> selected)
-                </span>
-              </h3>
-
-              <div class="product-selection__search">
-                <input
-                  type="text"
-                  placeholder="Search by name, SKU, or PID..."
-                  value={@product_search_query}
-                  phx-keyup="search_products"
-                  phx-debounce="300"
-                  class="input input--sm"
-                />
-              </div>
-            </div>
-
-            <div class="product-selection__grid" id="product-grid">
-              <%= if @new_session_products == [] do %>
-                <p class="product-selection__empty">
-                  No products found. Try a different search.
-                </p>
-              <% else %>
-                <%= for product <- @new_session_products do %>
-                  <div
-                    class={[
-                      "product-selection__item",
-                      MapSet.member?(@selected_product_ids, product.id) &&
-                        "product-selection__item--selected"
-                    ]}
-                    phx-click="toggle_product_selection"
-                    phx-value-product-id={product.id}
-                  >
-                    <%= if MapSet.member?(@selected_product_ids, product.id) do %>
-                      <div class="product-selection__checkmark">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5">
-                          <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
-                        </svg>
-                      </div>
-                    <% end %>
-
-                    <%= if product.primary_image do %>
-                      <img
-                        src={public_image_url(product.primary_image.thumbnail_path || product.primary_image.path)}
-                        alt={product.primary_image.alt_text}
-                        class="product-selection__image"
-                      />
-                    <% else %>
-                      <div class="product-selection__image-placeholder">
-                        No Image
-                      </div>
-                    <% end %>
-
-                    <p class="product-selection__name"><%= product.name %></p>
-                  </div>
-                <% end %>
-
-                <%= if @new_session_has_more do %>
-                  <div class="product-selection__loader">
-                    <.button
-                      type="button"
-                      phx-click="load_more_products"
-                      size="sm"
-                    >
-                      Load More Products
-                    </.button>
-                  </div>
-                <% end %>
-              <% end %>
-            </div>
+          <div style="margin-top: var(--space-4);">
+            <h3 style="font-size: var(--text-lg); font-weight: var(--font-semibold); margin: 0 0 var(--space-3) 0;">
+              Select Products
+              <span style="color: var(--color-text-secondary); font-weight: var(--font-normal); font-size: var(--text-base);">
+                (<%= MapSet.size(@selected_product_ids) %> selected)
+              </span>
+            </h3>
+            <.product_grid
+              products={@streams.new_session_products}
+              mode={:select}
+              search_query={@product_search_query}
+              has_more={@new_session_has_more}
+              selected_ids={@selected_product_ids}
+              on_product_click="toggle_product_selection"
+              on_search="search_products"
+              on_load_more="load_more_products"
+              show_search={true}
+              loading={@loading_products}
+              is_empty={@product_total_count == 0}
+            />
           </div>
         <% else %>
           <p class="text-sm text-secondary">
@@ -353,3 +320,57 @@
   product_edit_form={@product_edit_form}
   brands={@brands}
 />
+
+<!-- Edit Session Modal -->
+<%= if @editing_session do %>
+  <.modal
+    id="edit-session-modal"
+    show={true}
+    on_cancel={JS.push("close_edit_session_modal")}
+  >
+    <div class="modal__header">
+      <h2 class="modal__title">Edit Session</h2>
+    </div>
+
+    <div class="modal__body">
+      <.form
+        for={@session_edit_form}
+        phx-change="validate_edit_session"
+        phx-submit="update_session"
+        class="stack"
+      >
+        <.input
+          field={@session_edit_form[:brand_id]}
+          type="select"
+          label="Brand"
+          options={Enum.map(@brands, fn b -> {b.name, b.id} end)}
+        />
+
+        <.input
+          field={@session_edit_form[:name]}
+          type="text"
+          label="Session Name"
+        />
+
+        <.input
+          field={@session_edit_form[:notes]}
+          type="textarea"
+          label="Notes"
+          placeholder="Any additional notes about this session"
+        />
+
+        <div class="modal__footer">
+          <.button
+            type="button"
+            phx-click={JS.push("close_edit_session_modal") |> hide_modal("edit-session-modal")}
+          >
+            Cancel
+          </.button>
+          <.button type="submit" variant="primary" phx-disable-with="Saving...">
+            Save Changes
+          </.button>
+        </div>
+      </.form>
+    </div>
+  </.modal>
+<% end %>

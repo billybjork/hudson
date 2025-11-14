@@ -1,22 +1,27 @@
 defmodule HudsonWeb.ProductsLive.Index do
   use HudsonWeb, :live_view
 
-  alias Hudson.{Catalog, Media}
+  alias Hudson.Catalog
   alias Hudson.Catalog.Product
 
   import HudsonWeb.ProductComponents
 
   @impl true
   def mount(_params, _session, socket) do
-    products = Catalog.list_products_with_images()
     brands = Catalog.list_brands()
 
     socket =
       socket
-      |> assign(:products, products)
       |> assign(:brands, brands)
       |> assign(:editing_product, nil)
       |> assign(:product_edit_form, to_form(Product.changeset(%Product{}, %{})))
+      |> assign(:product_search_query, "")
+      |> assign(:product_page, 1)
+      |> assign(:product_total_count, 0)
+      |> assign(:products_has_more, false)
+      |> assign(:loading_products, false)
+      |> stream(:products, [])
+      |> load_products_for_browse()
 
     {:ok, socket}
   end
@@ -25,7 +30,13 @@ defmodule HudsonWeb.ProductsLive.Index do
   def handle_event("show_edit_product_modal", %{"product-id" => product_id}, socket) do
     product = Catalog.get_product_with_images!(product_id)
 
-    changeset = Product.changeset(product, %{})
+    # Convert prices from cents to dollars for display by passing as changes
+    changes = %{
+      "original_price_cents" => format_cents_to_dollars(product.original_price_cents),
+      "sale_price_cents" => format_cents_to_dollars(product.sale_price_cents)
+    }
+
+    changeset = Product.changeset(product, changes)
 
     socket =
       socket
@@ -62,12 +73,11 @@ defmodule HudsonWeb.ProductsLive.Index do
 
     case Catalog.update_product(socket.assigns.editing_product, product_params) do
       {:ok, _product} ->
-        # Refresh the products list
-        products = Catalog.list_products_with_images()
-
         socket =
           socket
-          |> assign(:products, products)
+          |> assign(:product_page, 1)
+          |> assign(:loading_products, true)
+          |> load_products_for_browse()
           |> assign(:editing_product, nil)
           |> assign(:product_edit_form, to_form(Product.changeset(%Product{}, %{})))
           |> put_flash(:info, "Product updated successfully")
@@ -84,7 +94,77 @@ defmodule HudsonWeb.ProductsLive.Index do
     end
   end
 
+  @impl true
+  def handle_event("search_products", %{"value" => query}, socket) do
+    socket =
+      socket
+      |> assign(:product_search_query, query)
+      |> assign(:product_page, 1)
+      |> assign(:loading_products, true)
+      |> load_products_for_browse()
+
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_event("load_more_products", _params, socket) do
+    socket =
+      socket
+      |> assign(:loading_products, true)
+      |> load_products_for_browse(append: true)
+
+    {:noreply, socket}
+  end
+
   # Helper functions
+
+  defp load_products_for_browse(socket, opts \\ [append: false]) do
+    append = Keyword.get(opts, :append, false)
+    search_query = socket.assigns.product_search_query
+    page = if append, do: socket.assigns.product_page + 1, else: 1
+
+    try do
+      result =
+        Catalog.search_products_paginated(
+          search_query: search_query,
+          page: page,
+          per_page: 20
+        )
+
+      # Precompute primary images for all products
+      products_with_images = Enum.map(result.products, &add_primary_image/1)
+
+      socket
+      |> assign(:loading_products, false)
+      |> stream(:products, products_with_images, reset: !append)
+      |> assign(:product_total_count, result.total)
+      |> assign(:product_page, result.page)
+      |> assign(:products_has_more, result.has_more)
+    rescue
+      e ->
+        socket
+        |> assign(:loading_products, false)
+        |> put_flash(:error, "Failed to load products")
+        |> IO.inspect(label: "Product loading error: #{inspect(e)}")
+    end
+  end
+
+  defp add_primary_image(product) do
+    primary_image =
+      product.product_images
+      |> Enum.find(& &1.is_primary)
+      |> case do
+        nil -> List.first(product.product_images)
+        image -> image
+      end
+
+    Map.put(product, :primary_image, primary_image)
+  end
+
+  defp format_cents_to_dollars(nil), do: nil
+  defp format_cents_to_dollars(cents) when is_integer(cents) do
+    cents / 100
+  end
 
   defp convert_prices_to_cents(params) do
     params
@@ -119,199 +199,4 @@ defmodule HudsonWeb.ProductsLive.Index do
     end
   end
 
-  @impl true
-  def render(assigns) do
-    ~H"""
-    <div class="products-index">
-      <div class="header">
-        <h1>Products</h1>
-        <.link navigate="/products/upload" class="button">Upload Images</.link>
-      </div>
-
-      <div class="products-grid">
-        <%= for product <- @products do %>
-          <div
-            class="product-card-link"
-            phx-click="show_edit_product_modal"
-            phx-value-product-id={product.id}
-          >
-            <div class="product-card">
-              <div class="product-image">
-                <%= if product.primary_image do %>
-                  <img
-                    src={Media.public_image_url(product.primary_image.path)}
-                    alt={product.name}
-                    loading="lazy"
-                  />
-                <% else %>
-                  <div class="no-image">No Image</div>
-                <% end %>
-              </div>
-
-              <div class="product-info">
-                <h3 class="product-name">{product.name}</h3>
-
-                <div class="product-price">
-                  <%= if product.sale_price_cents do %>
-                    <span class="original-price">
-                      ${Float.round(product.original_price_cents / 100, 2)}
-                    </span>
-                    <span class="sale-price">${Float.round(product.sale_price_cents / 100, 2)}</span>
-                  <% else %>
-                    <span class="price">${Float.round(product.original_price_cents / 100, 2)}</span>
-                  <% end %>
-                </div>
-
-                <%= if product.sku do %>
-                  <div class="product-sku">SKU: {product.sku}</div>
-                <% end %>
-
-                <div class="product-images-count">
-                  {length(product.product_images)} image(s)
-                </div>
-              </div>
-            </div>
-          </div>
-        <% end %>
-      </div>
-
-      <.product_edit_modal
-        editing_product={@editing_product}
-        product_edit_form={@product_edit_form}
-        brands={@brands}
-      />
-    </div>
-
-    <style>
-      .products-index {
-        padding: 2rem;
-        max-width: 1400px;
-        margin: 0 auto;
-      }
-
-      .header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 2rem;
-      }
-
-      .header h1 {
-        font-size: 2rem;
-        font-weight: bold;
-        margin: 0;
-      }
-
-      .button {
-        padding: 0.75rem 1.5rem;
-        background: #3b82f6;
-        color: white;
-        border-radius: 0.5rem;
-        text-decoration: none;
-        font-weight: 500;
-        transition: background 0.2s;
-      }
-
-      .button:hover {
-        background: #2563eb;
-      }
-
-      .products-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-        gap: 1.5rem;
-      }
-
-      .product-card-link {
-        text-decoration: none;
-        color: inherit;
-        display: block;
-      }
-
-      .product-card {
-        border: 1px solid #e5e7eb;
-        border-radius: 0.5rem;
-        overflow: hidden;
-        background: white;
-        transition: box-shadow 0.2s;
-        height: 100%;
-      }
-
-      .product-card-link:hover .product-card {
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-        cursor: pointer;
-      }
-
-      .product-image {
-        aspect-ratio: 1;
-        background: #f3f4f6;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        overflow: hidden;
-      }
-
-      .product-image img {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-      }
-
-      .no-image {
-        color: #9ca3af;
-        font-size: 0.875rem;
-      }
-
-      .product-info {
-        padding: 1rem;
-      }
-
-      .product-number {
-        font-size: 0.75rem;
-        color: #6b7280;
-        font-weight: 600;
-        margin-bottom: 0.25rem;
-      }
-
-      .product-name {
-        font-size: 1rem;
-        font-weight: 600;
-        margin: 0 0 0.5rem 0;
-        line-height: 1.4;
-      }
-
-      .product-price {
-        display: flex;
-        gap: 0.5rem;
-        align-items: center;
-        margin-bottom: 0.5rem;
-      }
-
-      .price, .sale-price {
-        font-size: 1.125rem;
-        font-weight: 700;
-        color: #059669;
-      }
-
-      .original-price {
-        font-size: 0.875rem;
-        color: #9ca3af;
-        text-decoration: line-through;
-      }
-
-      .product-sku {
-        font-size: 0.75rem;
-        color: #6b7280;
-        margin-bottom: 0.5rem;
-      }
-
-      .product-images-count {
-        font-size: 0.75rem;
-        color: #6b7280;
-        padding-top: 0.5rem;
-        border-top: 1px solid #f3f4f6;
-      }
-    </style>
-    """
-  end
 end

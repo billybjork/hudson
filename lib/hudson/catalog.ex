@@ -109,6 +109,7 @@ defmodule Hudson.Catalog do
   ## Options
     - brand_id: Filter by brand ID
     - search_query: Search by product name, SKU, or PID (default: "")
+    - exclude_ids: List of product IDs to exclude from results (default: [])
     - page: Current page number (default: 1)
     - per_page: Items per page (default: 20)
 
@@ -123,6 +124,7 @@ defmodule Hudson.Catalog do
   def search_products_paginated(opts \\ []) do
     brand_id = Keyword.get(opts, :brand_id)
     search_query = Keyword.get(opts, :search_query, "")
+    exclude_ids = Keyword.get(opts, :exclude_ids, [])
     page = Keyword.get(opts, :page, 1)
     per_page = Keyword.get(opts, :per_page, 20)
 
@@ -151,6 +153,14 @@ defmodule Hudson.Catalog do
         )
       else
         query
+      end
+
+    # Exclude products if IDs provided
+    query =
+      if Enum.empty?(exclude_ids) do
+        query
+      else
+        where(query, [p], p.id not in ^exclude_ids)
       end
 
     # Get total count
