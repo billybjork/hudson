@@ -315,7 +315,7 @@ defmodule HudsonWeb.ProductComponents do
 
       <div class="product-grid__grid" id="product-grid" phx-update="stream">
         <%= if @is_empty do %>
-          <div class="product-grid__empty">
+          <div id="product-grid-empty" class="product-grid__empty">
             No products found. Try a different search.
           </div>
         <% else %>
@@ -338,7 +338,7 @@ defmodule HudsonWeb.ProductComponents do
           <% end %>
 
           <%= if @has_more do %>
-            <div class="product-grid__loader">
+            <div id="product-grid-loader" class="product-grid__loader">
               <.button
                 type="button"
                 phx-click={@on_load_more}

@@ -10,6 +10,7 @@ defmodule Hudson.Application do
     children = [
       HudsonWeb.Telemetry,
       Hudson.Repo,
+      {Oban, Application.fetch_env!(:hudson, Oban)},
       {DNSCluster, query: Application.get_env(:hudson, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Hudson.PubSub},
       # Start a worker by calling: Hudson.Worker.start_link(arg)

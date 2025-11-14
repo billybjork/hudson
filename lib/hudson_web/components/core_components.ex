@@ -25,6 +25,12 @@ defmodule HudsonWeb.CoreComponents do
   alias Phoenix.HTML.{Form, FormField}
   alias Phoenix.LiveView.JS
 
+  # Verified routes for navigation
+  use Phoenix.VerifiedRoutes,
+    endpoint: HudsonWeb.Endpoint,
+    router: HudsonWeb.Router,
+    statics: HudsonWeb.static_paths()
+
   @doc """
   Renders flash notices.
 
@@ -303,6 +309,45 @@ defmodule HudsonWeb.CoreComponents do
         <div :if={@actions != []}>{render_slot(@actions)}</div>
       </div>
     </header>
+    """
+  end
+
+  @doc """
+  Renders a navigation bar with tabs and page-specific action buttons.
+
+  ## Examples
+
+      <.nav_tabs current_page={:sessions} />
+      <.nav_tabs current_page={:products} />
+  """
+  attr :current_page, :atom, required: true
+
+  def nav_tabs(assigns) do
+    ~H"""
+    <nav class="navbar">
+      <div class="navbar__nav">
+        <.link
+          href={~p"/sessions"}
+          class={["navbar__link", @current_page == :sessions && "navbar__link--active"]}
+        >
+          Sessions
+        </.link>
+        <.link
+          href={~p"/products"}
+          class={["navbar__link", @current_page == :products && "navbar__link--active"]}
+        >
+          Products
+        </.link>
+      </div>
+      <div class="navbar__end">
+        <.button :if={@current_page == :sessions} phx-click="show_new_session_modal" variant="primary">
+          New Session
+        </.button>
+        <.button :if={@current_page == :products} phx-click="show_new_product_modal" variant="primary">
+          New Product
+        </.button>
+      </div>
+    </nav>
     """
   end
 

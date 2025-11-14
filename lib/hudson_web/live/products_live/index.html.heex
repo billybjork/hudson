@@ -1,11 +1,6 @@
-<div class="products-index">
-  <div class="products-index__header">
-    <h1 class="products-index__title">Products</h1>
-    <button phx-click="show_new_product_modal" class="button">
-      New Product
-    </button>
-  </div>
+<.nav_tabs current_page={@current_page} />
 
+<div class="products-index">
   <.product_grid
     products={@streams.products}
     mode={:browse}
@@ -132,40 +127,3 @@
     </.modal>
   <% end %>
 </div>
-
-<style>
-  .products-index {
-    padding: var(--space-6);
-    max-width: 1400px;
-    margin: 0 auto;
-  }
-
-  .products-index__header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: var(--space-6);
-  }
-
-  .products-index__title {
-    font-size: var(--text-3xl);
-    font-weight: var(--font-bold);
-    margin: 0;
-  }
-
-  .button {
-    padding: var(--space-2) var(--space-4);
-    background-color: var(--color-primary);
-    color: white;
-    border-radius: var(--radius-md);
-    text-decoration: none;
-    font-weight: var(--font-medium);
-    transition: background-color var(--transition-fast);
-    display: inline-block;
-  }
-
-  .button:hover {
-    background-color: var(--color-primary-dark);
-    opacity: 0.9;
-  }
-</style>

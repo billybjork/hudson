@@ -218,6 +218,14 @@ defmodule Hudson.Catalog do
   def get_product!(id), do: Repo.get!(Product, id)
 
   @doc """
+  Gets a product by Shopify product ID (PID).
+  Returns nil if not found.
+  """
+  def get_product_by_pid(pid) do
+    Repo.get_by(Product, pid: pid)
+  end
+
+  @doc """
   Gets a product with images preloaded.
   """
   def get_product_with_images!(id) do
@@ -282,5 +290,13 @@ defmodule Hudson.Catalog do
   """
   def delete_product_image(%ProductImage{} = image) do
     Repo.delete(image)
+  end
+
+  @doc """
+  Deletes all images for a product.
+  """
+  def delete_product_images(product_id) do
+    from(pi in ProductImage, where: pi.product_id == ^product_id)
+    |> Repo.delete_all()
   end
 end

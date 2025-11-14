@@ -88,18 +88,29 @@ defmodule Hudson.Media do
   @doc """
   Constructs a public URL for an image path.
 
+  If the path is already a full URL (e.g., Shopify CDN), returns it as-is.
+  Otherwise, constructs a Supabase storage URL.
+
   Example:
     iex> Hudson.Media.public_image_url("9/full/1.jpg")
     "https://wqyufugasulvfrpgixqu.supabase.co/storage/v1/object/public/products/9/full/1.jpg"
+
+    iex> Hudson.Media.public_image_url("https://cdn.shopify.com/s/files/1/image.jpg")
+    "https://cdn.shopify.com/s/files/1/image.jpg"
   """
   def public_image_url(path) when is_binary(path) do
-    # Read from env var at runtime
-    storage_public_url =
-      System.get_env("SUPABASE_STORAGE_PUBLIC_URL") ||
-        Application.get_env(:hudson, :storage_public_url) ||
-        ""
+    # If path is already a full URL (Shopify CDN, etc), return as-is
+    if String.starts_with?(path, ["http://", "https://"]) do
+      path
+    else
+      # Read from env var at runtime
+      storage_public_url =
+        System.get_env("SUPABASE_STORAGE_PUBLIC_URL") ||
+          Application.get_env(:hudson, :storage_public_url) ||
+          ""
 
-    "#{storage_public_url}/#{@bucket}/#{path}"
+      "#{storage_public_url}/#{@bucket}/#{path}"
+    end
   end
 
   def public_image_url(_), do: "/images/placeholder.png"

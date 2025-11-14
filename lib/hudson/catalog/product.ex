@@ -39,8 +39,16 @@ defmodule Hudson.Catalog.Product do
     ])
     |> validate_required([:brand_id, :name, :original_price_cents])
     |> validate_number(:original_price_cents, greater_than: 0)
-    |> validate_number(:sale_price_cents, greater_than: 0)
+    |> validate_sale_price()
     |> unique_constraint(:pid)
     |> foreign_key_constraint(:brand_id)
+  end
+
+  defp validate_sale_price(changeset) do
+    case get_field(changeset, :sale_price_cents) do
+      nil -> changeset
+      price when price > 0 -> changeset
+      _ -> add_error(changeset, :sale_price_cents, "must be nil or greater than 0")
+    end
   end
 end

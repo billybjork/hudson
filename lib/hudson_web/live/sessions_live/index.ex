@@ -59,6 +59,8 @@ defmodule HudsonWeb.SessionsLive.Index do
   """
   use HudsonWeb, :live_view
 
+  on_mount {HudsonWeb.NavHooks, :set_current_page}
+
   alias Hudson.Catalog
   alias Hudson.Catalog.Product
   alias Hudson.Sessions

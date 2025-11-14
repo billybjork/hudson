@@ -9,6 +9,8 @@ defmodule HudsonWeb.SessionProducerLive do
   """
   use HudsonWeb, :live_view
 
+  on_mount {HudsonWeb.NavHooks, :set_current_page}
+
   alias Hudson.Sessions
   alias Hudson.Sessions.SessionProduct
 

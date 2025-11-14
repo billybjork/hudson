@@ -31,6 +31,19 @@ config :hudson, HudsonWeb.Endpoint,
 # at the `config/runtime.exs`.
 config :hudson, Hudson.Mailer, adapter: Swoosh.Adapters.Local
 
+# Configure Oban background job processing
+config :hudson, Oban,
+  repo: Hudson.Repo,
+  plugins: [
+    {Oban.Plugins.Pruner, max_age: 60 * 60 * 24 * 7},
+    {Oban.Plugins.Cron,
+     crontab: [
+       # Sync products every hour
+       {"0 * * * *", Hudson.Workers.ShopifySyncWorker}
+     ]}
+  ],
+  queues: [default: 10, shopify: 5]
+
 # Configure esbuild (the version is required)
 config :esbuild,
   version: "0.25.4",

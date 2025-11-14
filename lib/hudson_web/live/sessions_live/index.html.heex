@@ -1,14 +1,6 @@
-<div class="container container--xl region" phx-window-keydown="keydown" phx-key="Escape">
-  <.header>
-    Sessions Manager
-    <:subtitle>Manage your live streaming sessions and products</:subtitle>
-    <:actions>
-      <.button phx-click="show_new_session_modal" variant="primary">
-        New Session
-      </.button>
-    </:actions>
-  </.header>
+<.nav_tabs current_page={@current_page} />
 
+<div class="container container--xl region" phx-window-keydown="keydown" phx-key="Escape">
   <div class="stack stack--lg">
     <%= if @sessions == [] do %>
       <div class="session-card__empty-state">
