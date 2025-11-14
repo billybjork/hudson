@@ -175,27 +175,10 @@ products =
   csv_content
   |> SimpleCSV.parse()
   |> Enum.drop(1)  # Skip header row
-  |> Enum.filter(fn
-    # Filter out rows where first column is not a number
-    [display_num | _] ->
-      case Integer.parse(display_num || "") do
-        {_num, _} -> true
-        :error -> false
-      end
-    _ -> false
-  end)
-  |> Enum.with_index(1)
   |> Enum.map(fn {row, index} ->
     # Extract fields from CSV row
-    [display_num, _pic, details, original_price, sale_price, pid, sku, stock | _] =
+    [_display_num, _pic, details, original_price, sale_price, pid, sku | _] =
       row ++ List.duplicate("", 9)
-
-    # Parse display number (use index as fallback)
-    display_number =
-      case Integer.parse(display_num || "") do
-        {num, _} -> num
-        :error -> index
-      end
 
     # Parse details into name and talking points
     {name, talking_points_md} = DetailsParser.parse(details)
@@ -204,31 +187,27 @@ products =
     original_price_cents = PriceParser.parse(original_price)
     sale_price_cents = PriceParser.parse(sale_price)
 
-    # Parse stock
-    stock_num =
-      case Integer.parse(stock || "") do
-        {num, _} -> num
-        :error -> nil
-      end
+    # Build product map (use PID for image filename if available, otherwise use index)
+    image_filename = if pid != "" do
+      "#{String.slice(pid, 0, 50)}.jpg"
+    else
+      "#{index}.jpg"
+    end
 
-    # Build product map
     %{
-      display_number: display_number,
       name: String.slice(name, 0, 500),
-      # Ensure max 500 chars
       talking_points_md: talking_points_md,
       original_price_cents: original_price_cents,
       sale_price_cents: sale_price_cents,
       pid: if(pid != "", do: String.slice(pid, 0, 100), else: nil),
       sku: if(sku != "", do: String.slice(sku, 0, 100), else: nil),
-      stock: stock_num,
-      image_filename: "#{display_number}.jpg"
+      image_filename: image_filename
     }
   end)
   |> Enum.map(fn product ->
     # Set default price for products without one
     product = if is_nil(product.original_price_cents) || product.original_price_cents == 0 do
-      IO.puts("  ⚠️  Product #{product.display_number} (#{product.name}) missing price, using $0.01")
+      IO.puts("  ⚠️  Product (#{product.name}) missing price, using $0.01")
       %{product | original_price_cents: 1}
     else
       product
@@ -249,7 +228,7 @@ products
 |> Enum.take(3)
 |> Enum.each(fn p ->
   IO.puts("""
-    #{p.display_number}. #{p.name}
+    #{p.name}
        Price: $#{p.original_price_cents / 100}#{if p.sale_price_cents, do: " → $#{p.sale_price_cents / 100}", else: ""}
        PID: #{p.pid || "N/A"}
        SKU: #{p.sku || "N/A"}

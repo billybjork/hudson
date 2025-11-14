@@ -38,7 +38,7 @@ This document outlines planned features and enhancements beyond the MVP scope.
 **Features:**
 - One-way sync: Shopify → Hudson
 - Scheduled sync (hourly/daily)
-- Real-time price and stock updates
+- Real-time price updates
 - Automatic image import from Shopify CDN
 - Product variant support
 - Sync history and conflict resolution
@@ -63,7 +63,7 @@ end
 
 **Benefits:**
 - No manual product entry
-- Always current prices and stock
+- Always current prices
 - Reduced data inconsistency
 
 **Dependencies:**

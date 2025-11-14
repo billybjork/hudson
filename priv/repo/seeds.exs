@@ -51,7 +51,6 @@ IO.puts("\nStep 3: Creating sample products...")
 
 sample_products = [
   %{
-    display_number: 1,
     name: "Dainty CZ Rings Bundle",
     talking_points_md: """
     - Mila & X cross ring
@@ -65,7 +64,6 @@ sample_products = [
     sku: "BUNDLE-001"
   },
   %{
-    display_number: 2,
     name: "Heart Tennis Bracelet Set",
     talking_points_md: """
     - Heart Tennis Bracelet and Matching Heart Bezel Eternity Ring
@@ -79,7 +77,6 @@ sample_products = [
     sku: "BUNDLE-002"
   },
   %{
-    display_number: 3,
     name: "U Shaped & Paperclip Necklaces",
     talking_points_md: """
     - U-shaped: 18" + 3" extender, 8mm wide
@@ -91,7 +88,6 @@ sample_products = [
     sku: "BUNDLE-003"
   },
   %{
-    display_number: 4,
     name: "Interlocked Two Toned Ring",
     talking_points_md: """
     - #1 best seller in women's band rings
@@ -106,7 +102,6 @@ sample_products = [
     sku: "TA7"
   },
   %{
-    display_number: 5,
     name: "Pear Wavy Engagement Ring",
     talking_points_md: """
     - 7mm x 10mm pear cut
@@ -120,7 +115,6 @@ sample_products = [
     sku: "2311-R06"
   },
   %{
-    display_number: 6,
     name: "Oval Eternity Band",
     talking_points_md: """
     - 5A Quality Gem Grade Cubic Zirconia
@@ -134,7 +128,6 @@ sample_products = [
     sku: "TTK20C-R03"
   },
   %{
-    display_number: 7,
     name: "Milgrain Eternity Band",
     talking_points_md: """
     - Classic milgrain detailing
@@ -146,7 +139,6 @@ sample_products = [
     sku: "19B-TC20-Y6"
   },
   %{
-    display_number: 8,
     name: "Religious Cross Ring",
     talking_points_md: """
     - Delicate cross design
@@ -159,7 +151,6 @@ sample_products = [
     sku: "2209-R01"
   },
   %{
-    display_number: 9,
     name: "CZ Cross Pendant Necklace",
     talking_points_md: """
     - 14K gold plated
@@ -171,7 +162,6 @@ sample_products = [
     sku: "19B-TC08"
   },
   %{
-    display_number: 10,
     name: "Station Necklace",
     talking_points_md: """
     - 15" + 3" extender
@@ -184,7 +174,6 @@ sample_products = [
     sku: "21A-N11"
   },
   %{
-    display_number: 11,
     name: "Dainty Crystal Solitaire Necklace",
     talking_points_md: """
     - 1.5 Carat (7.3mm) CZ crystal
@@ -198,7 +187,6 @@ sample_products = [
     sku: "19B-TC06"
   },
   %{
-    display_number: 12,
     name: "Station CZ Hand Bracelet",
     talking_points_md: """
     - Ring portion: 4.2", chain: 3", bracelet: 6" + 2" extender
@@ -211,7 +199,6 @@ sample_products = [
     sku: "TKT2401-HC01-V2"
   },
   %{
-    display_number: 13,
     name: "Tennis Bracelet",
     talking_points_md: """
     - Round 3mm CZ stones in four-prong settings
@@ -226,7 +213,6 @@ sample_products = [
     sku: "TKT19B-TC16"
   },
   %{
-    display_number: 14,
     name: "Emerald Cut Tennis Bracelet",
     talking_points_md: """
     - 3mm x 4mm emerald-cut stones
@@ -238,7 +224,6 @@ sample_products = [
     sku: "2406-B05"
   },
   %{
-    display_number: 15,
     name: "Love Bangle",
     talking_points_md: """
     - 2.7mm premium CZ stones
@@ -252,7 +237,6 @@ sample_products = [
     sku: "BANGLE-001"
   },
   %{
-    display_number: 16,
     name: "Heart Charms Bracelet Set",
     talking_points_md: """
     - Two 9" bracelets included
@@ -265,7 +249,6 @@ sample_products = [
     sku: "2311-R05"
   },
   %{
-    display_number: 17,
     name: "Oval Pull-Through Earrings",
     talking_points_md: """
     - Statement earrings: 24mm x 18mm
@@ -278,7 +261,6 @@ sample_products = [
     sku: "2305-E04-Yv2"
   },
   %{
-    display_number: 18,
     name: "CZ Huggie Earrings Set",
     talking_points_md: """
     - Set of 3 sizes: 8mm, 10mm, 12mm
@@ -297,7 +279,7 @@ sample_products = [
 products =
   Enum.map(sample_products, fn attrs ->
     {:ok, product} = Catalog.create_product(Map.put(attrs, :brand_id, brand.id))
-    IO.puts("  ✓ Created product ##{product.display_number}: #{product.name}")
+    IO.puts("  ✓ Created product: #{product.name}")
     product
   end)
 
@@ -332,24 +314,15 @@ colors = [
 ]
 
 Enum.each(products, fn product ->
-  color = Enum.at(colors, rem(product.display_number - 1, length(colors)))
+  color = Enum.at(colors, rem(product.id - 1, length(colors)))
   placeholder_path = Path.join(placeholder_dir, "product_#{product.id}.jpg")
 
-  # Generate a simple colored square with product number
+  # Generate a simple colored square
   {_output, 0} =
     System.cmd("magick", [
       "-size",
       "800x800",
       "xc:#{color}",
-      "-pointsize",
-      "120",
-      "-fill",
-      "white",
-      "-gravity",
-      "center",
-      "-annotate",
-      "+0+0",
-      "#{product.display_number}",
       "-quality",
       "90",
       placeholder_path
@@ -368,11 +341,11 @@ Enum.each(products, fn product ->
           alt_text: "#{product.name}"
         })
 
-      IO.puts("  ✓ Generated image for product ##{product.display_number}")
+      IO.puts("  ✓ Generated image for product: #{product.name}")
 
     {:error, reason} ->
       IO.puts(
-        "  ✗ Failed to upload image for product ##{product.display_number}: #{inspect(reason)}"
+        "  ✗ Failed to upload image for product: #{inspect(reason)}"
       )
   end
 

@@ -83,7 +83,7 @@ defmodule Hudson.Import do
   def validate_data(_), do: {:error, "Invalid data format: missing products array"}
 
   defp validate_product(product, line) do
-    required = [:display_number, :name]
+    required = [:name]
     missing = Enum.filter(required, fn key -> !Map.has_key?(product, key) end)
 
     if Enum.empty?(missing) do
@@ -101,7 +101,6 @@ defmodule Hudson.Import do
     |> Enum.map(fn product ->
       %{
         action: if(product_exists?(product), do: :skip, else: :create),
-        display_number: product.display_number,
         name: product.name,
         has_image: !is_nil(product.image_filename),
         prices: {product.original_price_cents, product.sale_price_cents}
@@ -142,9 +141,9 @@ defmodule Hudson.Import do
   end
 
   defp import_product(product_data, brand, images_path, update_existing) do
-    # Check if product exists
+    # Check if product exists by PID (unique identifier)
     existing =
-      Repo.get_by(Product, display_number: product_data.display_number, brand_id: brand.id)
+      Repo.get_by(Product, pid: product_data.pid)
 
     cond do
       is_nil(existing) ->
@@ -154,7 +153,7 @@ defmodule Hudson.Import do
         update_product_with_images(existing, product_data, images_path)
 
       true ->
-        {:skipped, "Product #{product_data.display_number} already exists"}
+        {:skipped, "Product #{product_data.name} already exists"}
     end
   end
 
@@ -162,14 +161,12 @@ defmodule Hudson.Import do
     # Create product
     product_attrs = %{
       brand_id: brand.id,
-      display_number: product_data.display_number,
       name: product_data.name,
       talking_points_md: product_data.talking_points_md,
       original_price_cents: product_data.original_price_cents,
       sale_price_cents: product_data.sale_price_cents,
       pid: product_data.pid,
-      sku: product_data.sku,
-      stock: product_data.stock
+      sku: product_data.sku
     }
 
     case Catalog.create_product(product_attrs) do
@@ -179,12 +176,12 @@ defmodule Hudson.Import do
           upload_product_image(product, product_data.image_filename, images_path, 0)
         end
 
-        Logger.info("Created product #{product.display_number}: #{product.name}")
+        Logger.info("Created product: #{product.name}")
         {:ok, product}
 
       {:error, changeset} ->
         Logger.error(
-          "Failed to create product #{product_data.display_number}: #{inspect(changeset.errors)}"
+          "Failed to create product: #{inspect(changeset.errors)}"
         )
 
         {:error, "Failed to create product: #{inspect(changeset.errors)}"}
@@ -199,8 +196,7 @@ defmodule Hudson.Import do
       original_price_cents: product_data.original_price_cents,
       sale_price_cents: product_data.sale_price_cents,
       pid: product_data.pid,
-      sku: product_data.sku,
-      stock: product_data.stock
+      sku: product_data.sku
     }
 
     case Catalog.update_product(existing_product, update_attrs) do
@@ -210,12 +206,12 @@ defmodule Hudson.Import do
           upload_product_image(product, product_data.image_filename, images_path, 0)
         end
 
-        Logger.info("Updated product #{product.display_number}: #{product.name}")
+        Logger.info("Updated product: #{product.name}")
         {:ok, product}
 
       {:error, changeset} ->
         Logger.error(
-          "Failed to update product #{product_data.display_number}: #{inspect(changeset.errors)}"
+          "Failed to update product: #{inspect(changeset.errors)}"
         )
 
         {:error, "Failed to update product: #{inspect(changeset.errors)}"}
@@ -244,12 +240,12 @@ defmodule Hudson.Import do
 
       {:error, %Ecto.Changeset{} = changeset} ->
         Logger.error(
-          "Failed to create product_image record for product #{product.display_number}: #{inspect(changeset.errors)}"
+          "Failed to create product_image record for product: #{inspect(changeset.errors)}"
         )
 
       {:error, reason} ->
         Logger.error(
-          "Failed to upload image for product #{product.display_number}: #{inspect(reason)}"
+          "Failed to upload image: #{inspect(reason)}"
         )
     end
   end
@@ -257,7 +253,7 @@ defmodule Hudson.Import do
   defp product_exists?(product_data) do
     Repo.exists?(
       from p in Product,
-        where: p.display_number == ^product_data.display_number
+        where: p.pid == ^product_data.pid
     )
   end
 

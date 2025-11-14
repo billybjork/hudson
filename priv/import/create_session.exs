@@ -4,15 +4,11 @@
 #   mix run priv/import/create_session.exs <session_name> <slug> [options]
 #
 # Options:
-#   --brand-id=N              Specify brand ID (default: 1)
-#   --duration=N              Session duration in minutes (default: 180)
-#   --scheduled-at="DATETIME" Schedule time (default: now)
-#   --display-numbers=1,2,3   Only include specific products
+#   --brand-id=N  Specify brand ID (default: 1)
 #
 # Examples:
 #   mix run priv/import/create_session.exs "Holiday Favorites" holiday-favorites
-#   mix run priv/import/create_session.exs "BFCM 2024" bfcm-2024 --duration=240
-#   mix run priv/import/create_session.exs "Top 10" top-10 --display-numbers=1,2,3,4,5,6,7,8,9,10
+#   mix run priv/import/create_session.exs "BFCM 2024" bfcm-2024
 
 alias Hudson.{Repo, Sessions, Catalog}
 alias Hudson.Catalog.Product
@@ -21,10 +17,7 @@ alias Hudson.Catalog.Product
 {opts, args, _} = OptionParser.parse(
   System.argv(),
   strict: [
-    brand_id: :integer,
-    duration: :integer,
-    scheduled_at: :string,
-    display_numbers: :string
+    brand_id: :integer
   ]
 )
 
@@ -39,33 +32,13 @@ alias Hudson.Catalog.Product
 
     Examples:
       mix run priv/import/create_session.exs "Holiday Favorites" holiday-favorites
-      mix run priv/import/create_session.exs "BFCM 2024" bfcm-2024 --duration=240
+      mix run priv/import/create_session.exs "BFCM 2024" bfcm-2024
     """)
     System.halt(1)
 end
 
 # Parse options
 brand_id = opts[:brand_id] || 1
-duration_minutes = opts[:duration] || 180
-scheduled_at = case opts[:scheduled_at] do
-  nil -> NaiveDateTime.utc_now()
-  datetime_str ->
-    case NaiveDateTime.from_iso8601(datetime_str) do
-      {:ok, dt} -> dt
-      _ ->
-        IO.puts(:stderr, "Error: Invalid datetime format. Use ISO8601 format: 2024-12-15T18:00:00")
-        System.halt(1)
-    end
-end
-
-display_numbers = case opts[:display_numbers] do
-  nil -> nil
-  nums_str ->
-    nums_str
-    |> String.split(",")
-    |> Enum.map(&String.trim/1)
-    |> Enum.map(&String.to_integer/1)
-end
 
 # Display banner
 IO.puts("""
@@ -76,23 +49,15 @@ IO.puts("""
 Session Name: #{session_name}
 Slug:         #{slug}
 Brand ID:     #{brand_id}
-Duration:     #{duration_minutes} minutes
-Scheduled:    #{scheduled_at}
 """)
 
 # Get products for this brand
 import Ecto.Query
 
-products_query = from p in Product,
+products = from(p in Product,
   where: p.brand_id == ^brand_id,
-  order_by: [asc: p.display_number],
-  preload: [:product_images]
-
-products = if display_numbers do
-  from(p in products_query, where: p.display_number in ^display_numbers) |> Repo.all()
-else
-  Repo.all(products_query)
-end
+  preload: [:product_images])
+|> Repo.all()
 
 if Enum.empty?(products) do
   IO.puts(:stderr, "Error: No products found for brand ID #{brand_id}")
@@ -104,7 +69,7 @@ products
 |> Enum.take(10)
 |> Enum.each(fn p ->
   image_count = length(p.product_images)
-  IO.puts("  #{p.display_number}. #{p.name} (#{image_count} image#{if image_count != 1, do: "s", else: ""})")
+  IO.puts("  #{p.name} (#{image_count} image#{if image_count != 1, do: "s", else: ""})")
 end)
 
 if length(products) > 10 do
@@ -132,9 +97,6 @@ case Sessions.create_session(%{
   brand_id: brand_id,
   name: session_name,
   slug: slug,
-  scheduled_at: scheduled_at,
-  duration_minutes: duration_minutes,
-  status: "draft",
   notes: "Created by import script"
 }) do
   {:ok, session} ->

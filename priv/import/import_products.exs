@@ -84,7 +84,7 @@ case Import.read_import_data(folder_path) do
     products
     |> Enum.take(5)
     |> Enum.each(fn p ->
-      IO.puts("  #{p.display_number}. #{p.name} #{if p.image_filename, do: "📷", else: ""}")
+      IO.puts("  #{p.name} #{if p.image_filename, do: "📷", else: ""}")
     end)
 
     if length(products) > 5 do

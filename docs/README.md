@@ -120,7 +120,6 @@ Hudson provides:
 ```elixir
 Hudson.Catalog.create_product(%{
   brand_id: brand.id,
-  display_number: 1,
   name: "CZ Lariat Station Necklace",
   talking_points_md: "- High quality\n- Best seller",
   original_price_cents: 4999,

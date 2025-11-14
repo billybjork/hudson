@@ -196,9 +196,6 @@ defmodule HudsonWeb.HostViewComponents do
         <%= if @product.sku do %>
           <div class="meta-item">SKU: {@product.sku}</div>
         <% end %>
-        <%= if @product.stock do %>
-          <div class="meta-item">Stock: {@product.stock}</div>
-        <% end %>
       </div>
     </div>
     """

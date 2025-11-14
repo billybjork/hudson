@@ -183,8 +183,7 @@
           label="Product"
           options={
             Enum.map(@available_products, fn p ->
-              {p.name <> " (#{if p.display_number, do: "##{p.display_number}", else: "no #"})",
-               p.id}
+              {p.name, p.id}
             end)
           }
           prompt="Select a product"

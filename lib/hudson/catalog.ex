@@ -71,12 +71,11 @@ defmodule Hudson.Catalog do
   end
 
   @doc """
-  Lists all products with their images preloaded, ordered by display_number.
+  Lists all products with their images preloaded.
   Adds a primary_image virtual field for convenience.
   """
   def list_products_with_images do
     Product
-    |> order_by([p], asc: p.display_number)
     |> preload(:product_images)
     |> Repo.all()
     |> Enum.map(fn product ->
@@ -88,13 +87,12 @@ defmodule Hudson.Catalog do
   end
 
   @doc """
-  Lists products for a specific brand with their images preloaded, ordered by display_number.
+  Lists products for a specific brand with their images preloaded.
   Adds a primary_image virtual field for convenience.
   """
   def list_products_by_brand_with_images(brand_id) do
     Product
     |> where([p], p.brand_id == ^brand_id)
-    |> order_by([p], asc: p.display_number)
     |> preload(:product_images)
     |> Repo.all()
     |> Enum.map(fn product ->

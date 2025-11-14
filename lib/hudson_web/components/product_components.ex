@@ -76,24 +76,10 @@ defmodule HudsonWeb.ProductComponents do
               />
 
               <.input
-                field={@product_edit_form[:display_number]}
-                type="number"
-                label="Display Number"
-                placeholder="e.g., 1"
-              />
-
-              <.input
                 field={@product_edit_form[:name]}
                 type="text"
                 label="Product Name"
                 placeholder="e.g., Tennis Bracelet"
-              />
-
-              <.input
-                field={@product_edit_form[:short_name]}
-                type="text"
-                label="Short Name (Optional)"
-                placeholder="Abbreviated name for displays"
               />
 
               <.input
@@ -149,35 +135,10 @@ defmodule HudsonWeb.ProductComponents do
               />
 
               <.input
-                field={@product_edit_form[:stock]}
-                type="number"
-                label="Stock Quantity"
-                placeholder="e.g., 100"
-                min="0"
-              />
-
-              <.input
                 field={@product_edit_form[:external_url]}
                 type="text"
                 label="External URL"
                 placeholder="https://..."
-              />
-            </div>
-
-            <div class="stack">
-              <h3 class="text-lg font-semibold">Settings</h3>
-
-              <.input
-                field={@product_edit_form[:is_featured]}
-                type="checkbox"
-                label="Featured Product"
-              />
-
-              <.input
-                field={@product_edit_form[:tags]}
-                type="text"
-                label="Tags (comma-separated)"
-                placeholder="jewelry, gold, bracelet"
               />
             </div>
 

@@ -31,10 +31,9 @@ The Hudson domain model centers around **Products** (catalog) and **Sessions** (
          │────────────────│ │───────────────│
          │ id             │ │ id            │
          │ brand_id    ───┼─│ brand_id   ───┤
-         │ display_number │ │ name          │
-         │ name           │ │ slug          │
-         │ talking_points │ │ scheduled_at  │
-         │ prices         │ │ status        │
+         │ name           │ │ name          │
+         │ talking_points │ │ slug          │
+         │ prices         │ │ notes         │
          │ pid, sku       │ └───────────────┘
          └────────┬───────┘         │
                   │                 │
@@ -129,18 +128,13 @@ Catalog item with global product information. Products are reusable across multi
 |--------|------|-------------|-------------|
 | `id` | bigserial | PRIMARY KEY | Auto-incrementing ID |
 | `brand_id` | bigint | NOT NULL, REFERENCES brands(id) | Owning brand |
-| `display_number` | integer | NULLABLE | Product number for display (e.g., 1-40) |
 | `name` | varchar(500) | NOT NULL | Full product name |
-| `short_name` | varchar(100) | NULLABLE | Abbreviated name for UI |
 | `description` | text | NULLABLE | Short description |
 | `talking_points_md` | text | NULLABLE | Markdown-formatted bullet points |
 | `original_price_cents` | integer | NOT NULL | Original price in cents |
 | `sale_price_cents` | integer | NULLABLE | Sale price in cents |
 | `pid` | varchar(100) | NULLABLE, UNIQUE | TikTok Product ID or external ID |
 | `sku` | varchar(100) | NULLABLE | Internal SKU |
-| `stock` | integer | NULLABLE | Current stock quantity |
-| `is_featured` | boolean | NOT NULL, DEFAULT false | Featured product flag |
-| `tags` | text[] | NULLABLE | Array of tags |
 | `external_url` | varchar(500) | NULLABLE | Shopify/TikTok product URL |
 | `inserted_at` | timestamp | NOT NULL | Record creation |
 | `updated_at` | timestamp | NOT NULL | Last update |
@@ -150,7 +144,6 @@ Catalog item with global product information. Products are reusable across multi
 - Foreign key on `brand_id`
 - Unique index on `pid` (if not null)
 - Index on `sku`
-- GIN index on `tags` for array searches
 
 **Schema (Elixir):**
 ```elixir
@@ -159,18 +152,13 @@ defmodule Hudson.Catalog.Product do
   import Ecto.Changeset
 
   schema "products" do
-    field :display_number, :integer
     field :name, :string
-    field :short_name, :string
     field :description, :string
     field :talking_points_md, :string
     field :original_price_cents, :integer
     field :sale_price_cents, :integer
     field :pid, :string
     field :sku, :string
-    field :stock, :integer
-    field :is_featured, :boolean, default: false
-    field :tags, {:array, :string}, default: []
     field :external_url, :string
 
     belongs_to :brand, Hudson.Catalog.Brand
@@ -183,14 +171,13 @@ defmodule Hudson.Catalog.Product do
   def changeset(product, attrs) do
     product
     |> cast(attrs, [
-      :brand_id, :display_number, :name, :short_name, :description,
+      :brand_id, :name, :description,
       :talking_points_md, :original_price_cents, :sale_price_cents,
-      :pid, :sku, :stock, :is_featured, :tags, :external_url
+      :pid, :sku, :external_url
     ])
     |> validate_required([:brand_id, :name, :original_price_cents])
     |> validate_number(:original_price_cents, greater_than: 0)
     |> validate_number(:sale_price_cents, greater_than: 0)
-    |> validate_number(:stock, greater_than_or_equal_to: 0)
     |> unique_constraint(:pid)
     |> foreign_key_constraint(:brand_id)
   end
@@ -201,7 +188,6 @@ end
 - Prices stored in **cents** (integer) to avoid floating-point rounding errors
 - `talking_points_md` uses Markdown for formatting flexibility
 - `pid` is unique for integration with TikTok/Shopify
-- `tags` array for flexible categorization
 
 ---
 
@@ -319,10 +305,7 @@ A live streaming event with a curated product lineup.
 | `name` | varchar(500) | NOT NULL | Session name (e.g., "Holiday Favorites - Dec 2024 AM") |
 | `slug` | varchar(255) | NOT NULL, UNIQUE | URL-safe identifier |
 | `brand_id` | bigint | NOT NULL, REFERENCES brands(id) | Primary brand for session |
-| `scheduled_at` | timestamp | NULLABLE | When session is scheduled |
-| `duration_minutes` | integer | NULLABLE | Expected duration |
 | `notes` | text | NULLABLE | Producer notes |
-| `status` | varchar(50) | NOT NULL, DEFAULT 'draft' | `draft | live | complete` |
 | `inserted_at` | timestamp | NOT NULL | Record creation |
 | `updated_at` | timestamp | NOT NULL | Last update |
 
@@ -330,8 +313,6 @@ A live streaming event with a curated product lineup.
 - Primary key on `id`
 - Unique index on `slug`
 - Foreign key on `brand_id`
-- Index on `status`
-- Index on `scheduled_at`
 
 **Schema (Elixir):**
 ```elixir
@@ -342,10 +323,7 @@ defmodule Hudson.Sessions.Session do
   schema "sessions" do
     field :name, :string
     field :slug, :string
-    field :scheduled_at, :naive_datetime
-    field :duration_minutes, :integer
     field :notes, :string
-    field :status, :string, default: "draft"
 
     belongs_to :brand, Hudson.Catalog.Brand
     has_many :session_products, Hudson.Sessions.SessionProduct, preload_order: [asc: :position]
@@ -358,19 +336,13 @@ defmodule Hudson.Sessions.Session do
 
   def changeset(session, attrs) do
     session
-    |> cast(attrs, [:brand_id, :name, :slug, :scheduled_at, :duration_minutes, :notes, :status])
+    |> cast(attrs, [:brand_id, :name, :slug, :notes])
     |> validate_required([:brand_id, :name, :slug])
-    |> validate_inclusion(:status, ["draft", "live", "complete"])
     |> unique_constraint(:slug)
     |> foreign_key_constraint(:brand_id)
   end
 end
 ```
-
-**Status Flow:**
-1. `draft` - Being prepared
-2. `live` - Currently streaming
-3. `complete` - Finished
 
 ---
 
@@ -590,18 +562,13 @@ defmodule Hudson.Repo.Migrations.CreateProducts do
   def change do
     create table(:products) do
       add :brand_id, references(:brands, on_delete: :restrict), null: false
-      add :display_number, :integer
       add :name, :string, size: 500, null: false
-      add :short_name, :string, size: 100
       add :description, :text
       add :talking_points_md, :text
       add :original_price_cents, :integer, null: false
       add :sale_price_cents, :integer
       add :pid, :string, size: 100
       add :sku, :string, size: 100
-      add :stock, :integer
-      add :is_featured, :boolean, default: false, null: false
-      add :tags, {:array, :string}, default: []
       add :external_url, :string, size: 500
 
       timestamps()
@@ -610,7 +577,6 @@ defmodule Hudson.Repo.Migrations.CreateProducts do
     create index(:products, [:brand_id])
     create unique_index(:products, [:pid], where: "pid IS NOT NULL")
     create index(:products, [:sku])
-    create index(:products, [:tags], using: :gin)
   end
 end
 ```
@@ -668,8 +634,6 @@ end
 **Performance Indexes:**
 - `products(brand_id)` - Filter products by brand
 - `products(pid)` - Lookup by TikTok ID
-- `products(tags)` using GIN - Search by tags
-- `sessions(status, scheduled_at)` - Find upcoming/live sessions
 - `session_products(session_id, position)` - Ordered session products
 - `session_states(session_id)` - Quick state lookup
 
@@ -762,7 +726,6 @@ alias Hudson.Repo
 # Create products
 {:ok, necklace} = Catalog.create_product(%{
   brand_id: pavoi.id,
-  display_number: 1,
   name: "CZ Lariat Station Necklace - Gold",
   talking_points_md: """
   - High-quality cubic zirconia stones
@@ -773,9 +736,7 @@ alias Hudson.Repo
   original_price_cents: 4999,
   sale_price_cents: 2999,
   pid: "TT12345",
-  sku: "NECK-001",
-  stock: 150,
-  tags: ["necklace", "gold", "holiday"]
+  sku: "NECK-001"
 })
 
 # Add images
@@ -791,10 +752,7 @@ Catalog.create_product_image(necklace.id, %{
 {:ok, session} = Sessions.create_session(%{
   brand_id: pavoi.id,
   name: "Holiday Favorites - December 2024",
-  slug: "holiday-favorites-dec-2024",
-  scheduled_at: ~N[2024-12-15 18:00:00],
-  duration_minutes: 180,
-  status: "draft"
+  slug: "holiday-favorites-dec-2024"
 })
 
 # Assign host

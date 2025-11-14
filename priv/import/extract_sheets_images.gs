@@ -28,20 +28,19 @@ function extractImagesAndData() {
   // Find column indices from header row
   const headers = values[0];
   const colMap = {
-    number: headers.indexOf('#'),
     pic: headers.indexOf('PIC'),
     details: headers.indexOf('DETAILS/TALKING POINTS'),
     originalPrice: headers.indexOf('ORIGINAL PRICE'),
     salePrice: headers.indexOf('SALE PRICE'),
     pid: headers.indexOf('PID'),
-    sku: headers.indexOf('PAVOI SKU'),
-    stock: headers.indexOf('STOCK')
+    sku: headers.indexOf('PAVOI SKU')
   };
 
-  // Verify all columns exist
-  for (const [key, index] of Object.entries(colMap)) {
-    if (index === -1) {
-      throw new Error(`Column not found: ${key}. Please check your header row.`);
+  // Verify required columns exist
+  const requiredCols = ['pic', 'details', 'originalPrice', 'salePrice', 'pid', 'sku'];
+  for (const col of requiredCols) {
+    if (colMap[col] === -1) {
+      throw new Error(`Column not found: ${col}. Please check your header row.`);
     }
   }
 
@@ -61,22 +60,23 @@ function extractImagesAndData() {
   for (let i = 1; i < values.length; i++) {
     const row = values[i];
 
-    // Skip empty rows
-    if (!row[colMap.number]) continue;
-
-    const displayNumber = parseInt(row[colMap.number]);
+    // Skip empty rows (check for required name field)
+    const name = extractName(row[colMap.details]);
+    if (!name) continue;
 
     // Extract and save image
     let imageFilename = null;
     try {
       const imageBlob = extractImageFromCell(sheet, i + 1, colMap.pic + 1); // +1 for 1-indexed
       if (imageBlob) {
-        imageFilename = `${displayNumber}.jpg`;
+        // Use PID for image filename if available, otherwise use row index
+        const pid = String(row[colMap.pid] || '').trim();
+        imageFilename = pid ? `${pid}.jpg` : `${i}.jpg`;
         const imageFile = imagesFolder.createFile(imageBlob.setName(imageFilename));
         Logger.log(`Saved image: ${imageFilename}`);
       }
     } catch (e) {
-      Logger.log(`Warning: Could not extract image for product ${displayNumber}: ${e.message}`);
+      Logger.log(`Warning: Could not extract image for product: ${e.message}`);
     }
 
     // Parse prices
@@ -85,19 +85,17 @@ function extractImagesAndData() {
 
     // Build product object
     const product = {
-      display_number: displayNumber,
-      name: extractName(row[colMap.details]),
+      name: name,
       talking_points_md: formatTalkingPoints(row[colMap.details]),
       original_price_cents: originalPrice,
       sale_price_cents: salePrice,
       pid: String(row[colMap.pid] || '').trim(),
       sku: String(row[colMap.sku] || '').trim(),
-      stock: parseInt(row[colMap.stock]) || null,
       image_filename: imageFilename
     };
 
     products.push(product);
-    Logger.log(`Processed product ${displayNumber}: ${product.name}`);
+    Logger.log(`Processed product: ${product.name}`);
   }
 
   // Save products.json

@@ -323,7 +323,7 @@ _See [Implementation Guide](implementation_guide.md#performance) for implementat
 | Topic | Purpose | Subscribers | Payload |
 |-------|---------|-------------|---------|
 | `session:#{id}:state` | Current product/image changes + host messages | Host, Producer | SessionState struct with product_id, image_index, and host_message fields |
-| `session:#{id}:meta` | Session metadata changes | Admin | `{status, name, etc}` |
+| `session:#{id}:meta` | Session metadata changes | Admin | `{name, notes, etc}` |
 | `session:#{id}:presence` | Who's connected | All | Presence data |
 
 **Note:** Host messages are included in the main `:state` topic rather than a separate topic. This ensures atomic updates and simplifies synchronization.

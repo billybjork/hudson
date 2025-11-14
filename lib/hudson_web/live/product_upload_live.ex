@@ -90,7 +90,7 @@ defmodule HudsonWeb.ProductUploadLive do
           <option value="">-- Choose a product --</option>
           <%= for product <- @products do %>
             <option value={product.id} selected={@selected_product_id == product.id}>
-              {product.display_number}. {product.name}
+              {product.name}
             </option>
           <% end %>
         </select>

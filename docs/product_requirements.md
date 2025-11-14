@@ -144,7 +144,7 @@ These features are explicitly deferred to post-MVP phases:
 - Upload product images
 - Write initial talking points
 - Set prices and product details
-- Maintain product metadata (SKU, PID, stock)
+- Maintain product metadata (SKU, PID)
 
 **Pain Points (Current Workflow):**
 - No central product repository
@@ -170,10 +170,10 @@ These features are explicitly deferred to post-MVP phases:
 
 ### Epic 1: Session Preparation
 
-**US-1.1: As a producer, I want to create a new session with a name and date, so I can prepare for an upcoming live stream.**
+**US-1.1: As a producer, I want to create a new session with a name, so I can prepare for an upcoming live stream.**
 
 **Acceptance Criteria:**
-- Can create session with name, date, duration
+- Can create session with name
 - Can assign host(s) to session
 - Session appears in session list
 - Can add notes for internal reference
@@ -181,8 +181,8 @@ These features are explicitly deferred to post-MVP phases:
 **US-1.2: As a producer, I want to search and select products for a session, so I can build a curated product lineup.**
 
 **Acceptance Criteria:**
-- Can search products by name, SKU, PID, or tags
-- Can filter by brand or category
+- Can search products by name, SKU, or PID
+- Can filter by brand
 - Can preview product images and details
 - Selected products are added to session
 
@@ -300,13 +300,11 @@ These features are explicitly deferred to post-MVP phases:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  [Session: Holiday Favorites] [Product 23/40] [Connected ●] │ Header
+│  [Session: Holiday Favorites] [Connected ●]                  │ Header
 ├──────────────────────┬──────────────────────────────────────┤
 │                      │  CZ Lariat Station Necklace          │
-│                      │  Product #23                          │
 │    Product Image     │  PID: TT12345  SKU: NECK-001         │
 │    (Large)           │  $49.99  →  $29.99                   │
-│                      │  Stock: 150                           │
 │    [◀ Image 2/5 ▶]   │                                       │
 │                      ├──────────────────────────────────────┤
 │                      │  Talking Points:                      │
@@ -314,7 +312,7 @@ These features are explicitly deferred to post-MVP phases:
 │                      │  • Adjustable lariat style           │
 │                      │  • Station design with 5 CZ points   │
 │                      │  • Perfect for layering              │
-│                      │  • Best seller - limited stock       │
+│                      │  • Exclusive holiday collection      │
 └──────────────────────┴──────────────────────────────────────┘
 ```
 
@@ -366,7 +364,6 @@ These features are explicitly deferred to post-MVP phases:
 - Upcoming products preview (next 3)
 
 **Additional Controls:**
-- Session status toggle (Draft → Live → Complete)
 - Quick edit for talking points
 - Image upload
 - Product reordering
@@ -498,7 +495,6 @@ These features are explicitly deferred to post-MVP phases:
 ### Post-Launch Metrics
 
 **Usage Metrics:**
-- Average session duration
 - Products per session (target: 40+)
 - Keyboard shortcut usage rate (target: 90%+)
 - Mouse interaction rate (target: <10%)
@@ -546,7 +542,6 @@ These features are explicitly deferred to post-MVP phases:
 
 ### Product Decisions
 - [ ] Should host be able to skip products, or must they go sequentially?
-- [ ] How to handle out-of-stock products during live session (auto-hide, warning badge, reorder)?
 - [ ] Should price changes during session be allowed, and who approves them?
 
 ### Technical Decisions

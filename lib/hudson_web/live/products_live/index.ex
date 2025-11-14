@@ -149,7 +149,6 @@ defmodule HudsonWeb.ProductsLive.Index do
               </div>
 
               <div class="product-info">
-                <div class="product-number">#{product.display_number}</div>
                 <h3 class="product-name">{product.name}</h3>
 
                 <div class="product-price">
