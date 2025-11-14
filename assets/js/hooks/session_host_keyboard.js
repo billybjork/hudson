@@ -5,7 +5,6 @@
  * Primary Navigation (Direct Jumps):
  * - Type number digits (0-9) to build a product number
  * - Press Enter to jump to that product
- * - Home/End to jump to first/last
  *
  * Convenience Navigation (Sequential):
  * - Arrow keys (↑↓) for previous/next product
@@ -22,29 +21,18 @@ export default {
       if (document.getElementById('edit-product-modal')) return
 
       // Prevent default for navigation keys to avoid scrolling
-      const navKeys = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 'Home', 'End']
+      const navKeys = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space']
       if (navKeys.includes(e.code)) {
         e.preventDefault()
       }
 
       switch (e.code) {
-        // PRIMARY NAVIGATION: Jump to first/last
-        case 'Home':
-          this.pushEvent("jump_to_first", {})
-          break
-
-        case 'End':
-          this.pushEvent("jump_to_last", {})
-          break
-
         // CONVENIENCE: Sequential product navigation with arrow keys
         case 'ArrowDown':
-        case 'KeyJ':
           this.pushEvent("next_product", {})
           break
 
         case 'ArrowUp':
-        case 'KeyK':
           this.pushEvent("previous_product", {})
           break
 
@@ -55,12 +43,10 @@ export default {
 
         // IMAGE navigation (always sequential)
         case 'ArrowRight':
-        case 'KeyL':
           this.pushEvent("next_image", {})
           break
 
         case 'ArrowLeft':
-        case 'KeyH':
           this.pushEvent("previous_image", {})
           break
 

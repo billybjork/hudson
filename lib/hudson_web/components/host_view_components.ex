@@ -182,15 +182,6 @@ defmodule HudsonWeb.HostViewComponents do
           </span>
         <% end %>
       </div>
-
-      <div class="product-meta">
-        <%= if @product.pid do %>
-          <div class="meta-item">PID: {@product.pid}</div>
-        <% end %>
-        <%= if @product.sku do %>
-          <div class="meta-item">SKU: {@product.sku}</div>
-        <% end %>
-      </div>
     </div>
     """
   end

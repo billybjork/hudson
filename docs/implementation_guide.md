@@ -261,9 +261,8 @@ end
 
 **Keyboard Navigation:**
 - **Primary (Direct Jump):** Type number + Enter (e.g., "23" + Enter)
-- **Convenience (Sequential):** ↑/↓ arrows, J/K keys, Space
-- **Images:** ←/→ arrows, H/L keys
-- **Quick Jump:** Home (first), End (last)
+- **Convenience (Sequential):** ↑/↓ arrows, Space
+- **Images:** ←/→ arrows
 
 **Database Timestamp Handling:**
 ```elixir

@@ -46,10 +46,11 @@
 
 .modal__box {
   position: relative;
+  display: flex;
+  flex-direction: column;
   width: 100%;
   max-width: 600px;
   max-height: 90vh;
-  overflow-y: auto;
   background-color: var(--color-surface-primary);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-xl);
@@ -73,10 +74,11 @@
 /* Also support modal__content for consistency */
 .modal__content {
   position: relative;
+  display: flex;
+  flex-direction: column;
   width: 100%;
   max-width: 600px;
   max-height: 90vh;
-  overflow-y: auto;
   background-color: var(--color-surface-primary);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-xl);
@@ -87,6 +89,7 @@
 }
 
 .modal__header {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -122,21 +125,23 @@
 }
 
 .modal__body {
-  padding: 0;
-}
-
-/* Scrollable modal body for product grids */
-.modal__body--scrollable {
-  max-height: 60vh;
+  flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
+  padding: 0;
   /* Smooth scrolling for better UX */
   scroll-behavior: smooth;
-  /* Ensure proper rendering during scroll */
-  will-change: scroll-position;
+  /* Minimum height to prevent collapsing */
+  min-height: 0;
+}
+
+/* Scrollable modal body for product grids - deprecated, body is now scrollable by default */
+.modal__body--scrollable {
+  /* No additional styles needed - body handles scrolling */
 }
 
 .modal__footer {
+  flex-shrink: 0;
   display: flex;
   gap: var(--space-3);
   justify-content: flex-end;

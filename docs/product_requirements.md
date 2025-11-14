@@ -333,12 +333,10 @@ _Note: CSV import has been removed. Products are now managed via Shopify sync an
 | Key | Action | Notes |
 |-----|--------|-------|
 | `1-9`, `0` then `Enter` | Jump to product | **Primary navigation** - Type number, press Enter |
-| `Home` | First product | Jump to beginning |
-| `End` | Last product | Jump to end |
-| `↓` or `J` | Next product | Convenience - sequential navigation |
-| `↑` or `K` | Previous product | Convenience - sequential navigation |
-| `→` or `L` | Next image | For current product |
-| `←` or `H` | Previous image | For current product |
+| `↓` | Next product | Convenience - sequential navigation |
+| `↑` | Previous product | Convenience - sequential navigation |
+| `→` | Next image | For current product |
+| `←` | Previous image | For current product |
 | `Space` | Next product | Alternative to ↓ |
 | `F` | Toggle fullscreen image | Maximize current image |
 | `ESC` | Exit fullscreen | Return to normal view |

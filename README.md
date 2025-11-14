@@ -79,15 +79,13 @@ Hudson is designed for hands-free operation during live streams:
 
 ### Primary Navigation (Direct Jumps)
 - **Type number + Enter**: Jump directly to product (e.g., "23" → Enter jumps to product 23)
-- **Home**: Jump to first product
-- **End**: Jump to last product
 
 ### Convenience Navigation (Sequential)
-- **↓ or J**: Next product
-- **↑ or K**: Previous product
+- **↓**: Next product
+- **↑**: Previous product
 - **Space**: Next product
-- **← or H**: Previous image
-- **→ or L**: Next image
+- **←**: Previous image
+- **→**: Next image
 
 ## Core Features (MVP)
 

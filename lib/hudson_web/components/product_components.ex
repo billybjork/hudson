@@ -114,7 +114,7 @@ defmodule HudsonWeb.ProductComponents do
           <%= if @editing_product.product_images && length(@editing_product.product_images) > 0 do %>
             <div
               class="box box--bordered"
-              style="max-width: 500px; margin-bottom: var(--space-md); padding-bottom: var(--space-md);"
+              style="max-width: 500px; margin-bottom: var(--space-6);"
             >
               <HudsonWeb.ImageComponents.image_carousel
                 id_prefix={"edit-product-#{@editing_product.id}"}
@@ -126,6 +126,7 @@ defmodule HudsonWeb.ProductComponents do
           <% end %>
 
           <.form
+            id="edit-product-form"
             for={@product_edit_form}
             phx-change="validate_product"
             phx-submit="save_product"
@@ -195,22 +196,28 @@ defmodule HudsonWeb.ProductComponents do
                 placeholder="Stock keeping unit"
               />
             </div>
-
-            <div class="modal__footer">
-              <.button
-                type="button"
-                phx-click={
-                  JS.push("close_edit_product_modal")
-                  |> HudsonWeb.CoreComponents.hide_modal("edit-product-modal")
-                }
-              >
-                Cancel
-              </.button>
-              <.button type="submit" variant="primary" phx-disable-with="Saving...">
-                Save Changes
-              </.button>
-            </div>
           </.form>
+        </div>
+
+        <div class="modal__footer">
+          <.button
+            type="button"
+            variant="outline"
+            phx-click={
+              JS.push("close_edit_product_modal")
+              |> HudsonWeb.CoreComponents.hide_modal("edit-product-modal")
+            }
+          >
+            Cancel
+          </.button>
+          <.button
+            type="submit"
+            form="edit-product-form"
+            variant="primary"
+            phx-disable-with="Saving..."
+          >
+            Save Changes
+          </.button>
         </div>
       </.modal>
     <% end %>
