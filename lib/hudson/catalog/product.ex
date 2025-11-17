@@ -19,6 +19,7 @@ defmodule Hudson.Catalog.Product do
 
     belongs_to :brand, Hudson.Catalog.Brand
     has_many :product_images, Hudson.Catalog.ProductImage, preload_order: [asc: :position]
+    has_many :product_variants, Hudson.Catalog.ProductVariant, preload_order: [asc: :position]
     has_many :session_products, Hudson.Sessions.SessionProduct
 
     timestamps()

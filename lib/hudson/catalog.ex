@@ -6,7 +6,7 @@ defmodule Hudson.Catalog do
   import Ecto.Query, warn: false
   alias Hudson.Repo
 
-  alias Hudson.Catalog.{Brand, Product, ProductImage}
+  alias Hudson.Catalog.{Brand, Product, ProductImage, ProductVariant}
 
   ## Brands
 
@@ -226,14 +226,15 @@ defmodule Hudson.Catalog do
   end
 
   @doc """
-  Gets a product with images preloaded.
+  Gets a product with images and variants preloaded.
   """
   def get_product_with_images!(id) do
     ordered_images = from(pi in ProductImage, order_by: [asc: pi.position])
+    ordered_variants = from(pv in ProductVariant, order_by: [asc: pv.position])
 
     Product
     |> where([p], p.id == ^id)
-    |> preload(product_images: ^ordered_images)
+    |> preload(product_images: ^ordered_images, product_variants: ^ordered_variants)
     |> Repo.one!()
   end
 
@@ -298,5 +299,48 @@ defmodule Hudson.Catalog do
   def delete_product_images(product_id) do
     from(pi in ProductImage, where: pi.product_id == ^product_id)
     |> Repo.delete_all()
+  end
+
+  ## Product Variants
+
+  @doc """
+  Creates a product variant.
+  """
+  def create_product_variant(attrs \\ %{}) do
+    %ProductVariant{}
+    |> ProductVariant.changeset(attrs)
+    |> Repo.insert()
+  end
+
+  @doc """
+  Updates a product variant.
+  """
+  def update_product_variant(%ProductVariant{} = variant, attrs) do
+    variant
+    |> ProductVariant.changeset(attrs)
+    |> Repo.update()
+  end
+
+  @doc """
+  Deletes a product variant.
+  """
+  def delete_product_variant(%ProductVariant{} = variant) do
+    Repo.delete(variant)
+  end
+
+  @doc """
+  Deletes all variants for a product.
+  """
+  def delete_product_variants(product_id) do
+    from(pv in ProductVariant, where: pv.product_id == ^product_id)
+    |> Repo.delete_all()
+  end
+
+  @doc """
+  Gets a product variant by Shopify variant ID.
+  Returns nil if not found.
+  """
+  def get_variant_by_shopify_id(shopify_variant_id) do
+    Repo.get_by(ProductVariant, shopify_variant_id: shopify_variant_id)
   end
 end

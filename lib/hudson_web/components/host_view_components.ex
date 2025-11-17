@@ -75,6 +75,13 @@ defmodule HudsonWeb.HostViewComponents do
           />
 
           <.talking_points_section talking_points_html={@talking_points_html} />
+
+          <%= if @current_product.product_variants && length(@current_product.product_variants) > 0 do %>
+            <HudsonWeb.ProductComponents.product_variants
+              variants={@current_product.product_variants}
+              compact={true}
+            />
+          <% end %>
         </div>
       </div>
     <% else %>

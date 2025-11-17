@@ -72,6 +72,118 @@ defmodule HudsonWeb.ProductComponents do
   alias Phoenix.LiveView.JS
 
   @doc """
+  Displays product variants in a clean, structured format.
+
+  Shows variant title, price, and SKU (in non-compact mode).
+  For products with many variants, shows first 5 with "Show more" button.
+
+  ## Attributes
+  - `variants` - List of ProductVariant structs (optional)
+  - `compact` - Boolean for compact display mode (default: false)
+  """
+  attr :variants, :list, default: []
+  attr :compact, :boolean, default: false
+
+  def product_variants(assigns) do
+    # Prepare variant data
+    assigns =
+      assigns
+      |> assign(:initial_variants, Enum.take(assigns.variants, 5))
+      |> assign(:remaining_variants, Enum.drop(assigns.variants, 5))
+      |> assign(:has_more, length(assigns.variants) > 5)
+      |> assign(:remaining_count, max(0, length(assigns.variants) - 5))
+      |> assign(:variant_id, "variants-#{:erlang.phash2(assigns.variants)}")
+
+    ~H"""
+    <%= if @variants && length(@variants) > 0 do %>
+      <div class={["product-variants", @compact && "product-variants--compact"]}>
+        <h3 class="product-variants__title">
+          Variants ({length(@variants)})
+        </h3>
+        <div class="product-variants__list">
+          <%!-- Always show first 5 variants --%>
+          <%= for variant <- @initial_variants do %>
+            <div class="product-variant">
+              <div class="product-variant__header">
+                <div class="product-variant__info">
+                  <span class="product-variant__title">{variant.title}</span>
+                  <%= if !@compact && variant.sku do %>
+                    <span class="product-variant__sku">SKU: {variant.sku}</span>
+                  <% end %>
+                </div>
+                <span class="product-variant__price">
+                  <%= if variant.compare_at_price_cents do %>
+                    <span class="product-variant__price-sale">
+                      ${format_price_cents(variant.price_cents)}
+                    </span>
+                    <span class="product-variant__price-original">
+                      ${format_price_cents(variant.compare_at_price_cents)}
+                    </span>
+                  <% else %>
+                    ${format_price_cents(variant.price_cents)}
+                  <% end %>
+                </span>
+              </div>
+            </div>
+          <% end %>
+
+          <%!-- Show remaining variants when expanded --%>
+          <%= if @has_more do %>
+            <div id={"#{@variant_id}-more"} class="product-variants__more" style="display: none;">
+              <%= for variant <- @remaining_variants do %>
+                <div class="product-variant">
+                  <div class="product-variant__header">
+                    <div class="product-variant__info">
+                      <span class="product-variant__title">{variant.title}</span>
+                      <%= if !@compact && variant.sku do %>
+                        <span class="product-variant__sku">SKU: {variant.sku}</span>
+                      <% end %>
+                    </div>
+                    <span class="product-variant__price">
+                      <%= if variant.compare_at_price_cents do %>
+                        <span class="product-variant__price-sale">
+                          ${format_price_cents(variant.price_cents)}
+                        </span>
+                        <span class="product-variant__price-original">
+                          ${format_price_cents(variant.compare_at_price_cents)}
+                        </span>
+                      <% else %>
+                        ${format_price_cents(variant.price_cents)}
+                      <% end %>
+                    </span>
+                  </div>
+                </div>
+              <% end %>
+            </div>
+
+            <button
+              type="button"
+              id={"#{@variant_id}-toggle"}
+              class="product-variants__toggle"
+              phx-click={
+                JS.toggle(to: "##{@variant_id}-more")
+                |> JS.toggle_class("product-variants__toggle--expanded",
+                  to: "##{@variant_id}-toggle"
+                )
+              }
+            >
+              Show all {@remaining_count} more variants
+            </button>
+          <% end %>
+        </div>
+      </div>
+    <% end %>
+    """
+  end
+
+  defp format_price_cents(nil), do: "N/A"
+
+  defp format_price_cents(cents) when is_integer(cents) do
+    dollars = cents / 100
+    :erlang.float_to_binary(dollars, decimals: 2)
+  end
+
+  @doc """
   Renders the product edit modal dialog.
 
   This component handles editing product details including basic info, pricing,
@@ -123,6 +235,10 @@ defmodule HudsonWeb.ProductComponents do
                 mode={:full}
               />
             </div>
+          <% end %>
+
+          <%= if @editing_product.product_variants && length(@editing_product.product_variants) > 0 do %>
+            <.product_variants variants={@editing_product.product_variants} />
           <% end %>
 
           <.form

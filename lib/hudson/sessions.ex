@@ -6,7 +6,7 @@ defmodule Hudson.Sessions do
   import Ecto.Query, warn: false
   alias Hudson.Repo
 
-  alias Hudson.Catalog.ProductImage
+  alias Hudson.Catalog.{ProductImage, ProductVariant}
   alias Hudson.Sessions.{Session, SessionProduct, SessionState}
 
   ## Sessions
@@ -216,9 +216,10 @@ defmodule Hudson.Sessions do
   """
   def get_session_product!(id) do
     ordered_images = from(pi in ProductImage, order_by: [asc: pi.position])
+    ordered_variants = from(pv in ProductVariant, order_by: [asc: pv.position])
 
     SessionProduct
-    |> preload(product: [:brand, product_images: ^ordered_images])
+    |> preload(product: [:brand, product_images: ^ordered_images, product_variants: ^ordered_variants])
     |> Repo.get!(id)
   end
 
@@ -273,80 +274,56 @@ defmodule Hudson.Sessions do
   end
 
   @doc """
-  Swaps the positions of two adjacent session products and renumbers the session.
+  Reorders session products based on a list of session_product IDs.
 
-  Uses a temporary position to avoid constraint violations, then renumbers all products
-  to maintain sequential positions. This ensures positions always start at 1 and have no gaps.
+  Takes a session_id and a list of session_product IDs in the desired order.
+  Updates the position field for each session_product efficiently using batch updates.
 
-  Returns {:ok, {product1, product2}} on success.
+  Returns {:ok, count} where count is the number of updated records.
   """
-  def swap_product_positions(session_product_id_1, session_product_id_2) do
-    sp1 = Repo.get(SessionProduct, session_product_id_1)
-    sp2 = Repo.get(SessionProduct, session_product_id_2)
+  def reorder_products(session_id, ordered_session_product_ids) do
+    result =
+      Repo.transaction(fn ->
+        # Step 1: Move all products to temporary positions to avoid constraint violations
+        # Use a high offset (10000) to ensure no conflicts with existing positions
+        ordered_session_product_ids
+        |> Enum.with_index(1)
+        |> Enum.each(fn {session_product_id, index} ->
+          temp_position = 10_000 + index
 
-    cond do
-      is_nil(sp1) or is_nil(sp2) ->
-        {:error, :not_found}
+          from(sp in SessionProduct,
+            where: sp.id == ^session_product_id and sp.session_id == ^session_id
+          )
+          |> Repo.update_all(set: [position: temp_position])
+        end)
 
-      sp1.session_id != sp2.session_id ->
-        {:error, :different_sessions}
-
-      true ->
-        result =
-          Repo.transaction(fn ->
-            # Use temporary position to avoid constraint violations
-            temp_pos = 999_999
-
-            # Step 1: Move sp1 to temp position
-            sp1
-            |> Ecto.Changeset.change(position: temp_pos)
-            |> Repo.update!()
-
-            # Step 2: Move sp2 to sp1's original position
-            sp2
-            |> Ecto.Changeset.change(position: sp1.position)
-            |> Repo.update!()
-
-            # Step 3: Move sp1 from temp to sp2's original position
-            sp1
-            |> Ecto.Changeset.change(position: sp2.position)
-            |> Repo.update!()
-
-            # Renumber all products in the session to ensure sequential 1, 2, 3, etc.
-            renumber_session_products_in_transaction(sp1.session_id)
-
-            {sp1, sp2}
+        # Step 2: Update each product to its final position
+        count =
+          ordered_session_product_ids
+          |> Enum.with_index(1)  # Start positions at 1
+          |> Enum.map(fn {session_product_id, new_position} ->
+            from(sp in SessionProduct,
+              where: sp.id == ^session_product_id and sp.session_id == ^session_id
+            )
+            |> Repo.update_all(set: [position: new_position])
+            |> elem(0)  # Returns {count, nil}, we want count
           end)
+          |> Enum.sum()
 
-        # Touch the session's updated_at timestamp
-        case result do
-          {:ok, _} -> touch_session(sp1.session_id)
-          error -> error
-        end
+        # Touch the session to update its modified timestamp
+        touch_session(session_id)
 
-        result
-        |> broadcast_session_list_change()
+        count
+      end)
+
+    case result do
+      {:ok, count} ->
+        broadcast_session_list_change({:ok, count})
+        {:ok, count}
+
+      {:error, reason} ->
+        {:error, reason}
     end
-  end
-
-  # Helper to renumber products within an existing transaction
-  defp renumber_session_products_in_transaction(session_id) do
-    session_products =
-      from(sp in SessionProduct,
-        where: sp.session_id == ^session_id,
-        order_by: [asc: sp.position]
-      )
-      |> Repo.all()
-
-    session_products
-    |> Enum.with_index(1)
-    |> Enum.each(fn {sp, new_position} ->
-      if sp.position != new_position do
-        sp
-        |> Ecto.Changeset.change(position: new_position)
-        |> Repo.update!()
-      end
-    end)
   end
 
   @doc """

@@ -107,7 +107,7 @@ defmodule Hudson.Workers.ShopifySyncWorker do
         pid: shopify_product["id"],
         name: shopify_product["title"],
         description: shopify_product["descriptionHtml"],
-        talking_points_md: format_variants_as_markdown(variants),
+        talking_points_md: nil,
         original_price_cents: get_minimum_variant_price(variants),
         sale_price_cents: get_minimum_compare_at_price(variants),
         sku: get_first_variant_sku(variants),
@@ -119,6 +119,9 @@ defmodule Hudson.Workers.ShopifySyncWorker do
 
       # Sync images
       sync_images(product, images)
+
+      # Sync variants
+      sync_variants(product, variants)
 
       # Return image count
       length(images)
@@ -212,6 +215,42 @@ defmodule Hudson.Workers.ShopifySyncWorker do
     end)
   end
 
+  defp sync_variants(product, shopify_variants) do
+    # Delete existing variants
+    Catalog.delete_product_variants(product.id)
+
+    # Create new variants
+    Enum.with_index(shopify_variants, fn variant, index ->
+      # Convert selectedOptions array to a map
+      selected_options =
+        (variant["selectedOptions"] || [])
+        |> Enum.map(fn opt -> {opt["name"], opt["value"]} end)
+        |> Enum.into(%{})
+
+      case Catalog.create_product_variant(%{
+             product_id: product.id,
+             shopify_variant_id: variant["id"],
+             title: variant["title"],
+             sku: variant["sku"],
+             price_cents: parse_price_to_cents(variant["price"]),
+             compare_at_price_cents: parse_compare_at_price(variant["compareAtPrice"]),
+             barcode: variant["barcode"],
+             position: index,
+             selected_options: selected_options
+           }) do
+        {:ok, product_variant} ->
+          product_variant
+
+        {:error, changeset} ->
+          Logger.error(
+            "Failed to create product variant for #{product.name} (#{variant["title"]}): #{inspect(changeset.errors)}"
+          )
+
+          raise "Failed to create product variant"
+      end
+    end)
+  end
+
   # Price conversion functions
 
   @doc """
@@ -289,34 +328,4 @@ defmodule Hudson.Workers.ShopifySyncWorker do
   """
   def get_first_variant_sku([]), do: nil
   def get_first_variant_sku([first | _rest]), do: first["sku"]
-
-  @doc """
-  Formats variants as markdown for talking_points_md field.
-
-  Includes variant title, pricing, SKU, and options.
-  """
-  def format_variants_as_markdown([]), do: ""
-
-  def format_variants_as_markdown(variants) do
-    # Only show compare price if it exists and is not "0" or "0.00"
-    """
-    ## Variants
-
-    #{Enum.map_join(variants, "\n", fn variant ->
-      options = Enum.map_join(variant["selectedOptions"] || [], ", ", &"#{&1["name"]}: #{&1["value"]}")
-
-      price = "$#{variant["price"]}"
-      compare_price = case variant["compareAtPrice"] do
-        nil -> ""
-        "0" -> ""
-        "0.00" -> ""
-        compare -> " (was $#{compare})"
-      end
-
-      option_line = if options != "", do: "\n  - #{options}", else: ""
-
-      "- **#{variant["title"]}** - #{price}#{compare_price}\n  - SKU: #{variant["sku"]}#{option_line}"
-    end)}
-    """
-  end
 end
