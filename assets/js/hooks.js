@@ -7,6 +7,7 @@ import ProductEditModalKeyboard from "./hooks/product_edit_modal_keyboard"
 import ProductSortable from "./hooks/product_sortable"
 import ThemeToggle from "./hooks/theme_toggle"
 import MessageInput from "./hooks/message_input"
+import GlobalNavigation from "./hooks/global_navigation"
 
 const Hooks = {
   SessionHostKeyboard,
@@ -15,7 +16,8 @@ const Hooks = {
   ProductEditModalKeyboard,
   ProductSortable,
   ThemeToggle,
-  MessageInput
+  MessageInput,
+  GlobalNavigation
 }
 
 export default Hooks

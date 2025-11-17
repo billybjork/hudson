@@ -126,6 +126,15 @@
   color: var(--color-accent-red);
 }
 
+/* Size variants */
+.input--sm,
+select.input--sm {
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+  height: 36px;
+  line-height: 1.5;
+}
+
 /* Darker inputs in modals for better contrast */
 .modal .input,
 .modal .select,

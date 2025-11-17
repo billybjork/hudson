@@ -109,8 +109,10 @@ defmodule Hudson.Catalog do
       "price_asc" -> [asc: :original_price_cents]
       "price_desc" -> [desc: :original_price_cents]
       "name" -> [asc: :name]
-      "" -> [asc: :name]  # Default/blank: sort by name
-      _ -> [asc: :name]  # Fallback for invalid values
+      # Default/blank: sort by name
+      "" -> [asc: :name]
+      # Fallback for invalid values
+      _ -> [asc: :name]
     end
   end
 

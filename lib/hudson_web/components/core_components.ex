@@ -326,7 +326,7 @@ defmodule HudsonWeb.CoreComponents do
 
   def nav_tabs(assigns) do
     ~H"""
-    <nav class="navbar">
+    <nav id="global-nav" class="navbar" phx-hook="GlobalNavigation">
       <div class="navbar__nav">
         <.link
           href={~p"/sessions"}

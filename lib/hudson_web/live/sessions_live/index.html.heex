@@ -6,7 +6,11 @@
   current_product={@current_product_name}
 />
 
-<div class="container container--xl region" phx-window-keydown={JS.push("keydown") |> JS.hide(to: ".session-menu", transition: "fade-out")} phx-key="Escape">
+<div
+  class="container container--xl region"
+  phx-window-keydown={JS.push("keydown") |> JS.hide(to: ".session-menu", transition: "fade-out")}
+  phx-key="Escape"
+>
   <div class="stack stack--lg">
     <%= if @sessions == [] do %>
       <div class="session-card__empty-state">
@@ -332,7 +336,7 @@
         <.input
           field={@session_form[:notes]}
           type="textarea"
-          label="Notes"
+          label="Session Notes"
           placeholder="Any additional notes about this session"
         />
       </.form>
@@ -428,7 +432,7 @@
         <.input
           field={@session_edit_form[:notes]}
           type="textarea"
-          label="Notes"
+          label="Session Notes"
           placeholder="Any additional notes about this session"
         />
       </.form>

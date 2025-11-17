@@ -237,7 +237,7 @@ defmodule HudsonWeb.ProductComponents do
               />
             </div>
           <% end %>
-
+          
     <!-- Product details -->
           <div class="stack" style="gap: var(--space-3);">
             <div style="color: var(--color-text-primary);">
@@ -283,7 +283,7 @@ defmodule HudsonWeb.ProductComponents do
               </div>
             <% end %>
           </div>
-
+          
     <!-- Talking Points - Editable field -->
           <div style="margin-top: var(--space-6);">
             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-2);">
@@ -314,7 +314,7 @@ defmodule HudsonWeb.ProductComponents do
               <.input
                 field={@product_edit_form[:talking_points_md]}
                 type="textarea"
-                placeholder="- Point 1&#10;- Point 2&#10;- Point 3"
+                placeholder="Key features and highlights for the livestream..."
               />
             </.form>
           </div>
@@ -458,8 +458,12 @@ defmodule HudsonWeb.ProductComponents do
                   >
                     <option value="">-- Sort by --</option>
                     <option value="name" selected={@sort_by == "name"}>Name (A-Z)</option>
-                    <option value="price_asc" selected={@sort_by == "price_asc"}>Price: Low to High</option>
-                    <option value="price_desc" selected={@sort_by == "price_desc"}>Price: High to Low</option>
+                    <option value="price_asc" selected={@sort_by == "price_asc"}>
+                      Price: Low to High
+                    </option>
+                    <option value="price_desc" selected={@sort_by == "price_desc"}>
+                      Price: High to Low
+                    </option>
                   </select>
                 </form>
               </div>
@@ -504,7 +508,9 @@ defmodule HudsonWeb.ProductComponents do
           id={
             if @use_dynamic_id do
               # Include both search and sort in ID to force re-render on changes
-              search_part = if @search_query == "", do: "all", else: String.replace(@search_query, " ", "-")
+              search_part =
+                if @search_query == "", do: "all", else: String.replace(@search_query, " ", "-")
+
               sort_part = if @sort_by == "", do: "default", else: @sort_by
               "product-grid-#{search_part}-#{sort_part}"
             else

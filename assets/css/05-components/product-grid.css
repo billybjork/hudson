@@ -58,6 +58,8 @@
   color: var(--color-text-secondary);
   font-weight: var(--font-normal);
   font-size: var(--text-base);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .product-grid__sync {
@@ -71,6 +73,7 @@
   color: var(--color-text-secondary);
   font-size: var(--text-sm);
   font-weight: var(--font-normal);
+  white-space: nowrap;
 }
 
 /* ============================================================================
@@ -79,12 +82,13 @@
 
 .product-grid--select .product-grid__grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(120px, 140px));
   gap: var(--space-3);
   padding: var(--space-2);
   border: 1px solid var(--color-border-secondary);
   border-radius: var(--radius-md);
   background-color: var(--color-surface-primary);
+  justify-content: center;
   /* Allow grid to grow naturally for infinite scroll */
   min-height: min-content;
 }
@@ -305,6 +309,8 @@ infinite-scroll-trigger {
 
   .product-grid--select .product-grid__controls {
     flex-wrap: nowrap;
+    flex: 0 0 50%;
+    min-width: 0;
   }
 
   .product-grid--select .product-grid__search {
