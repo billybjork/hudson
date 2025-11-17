@@ -219,7 +219,7 @@ defmodule HudsonWeb.ProductComponents do
         phx-hook="ProductEditModalKeyboard"
       >
         <div class="modal__header">
-          <h2 class="modal__title">Edit Product</h2>
+          <h2 class="modal__title"><%= @editing_product.name %></h2>
         </div>
 
         <div class="modal__body">
@@ -237,82 +237,70 @@ defmodule HudsonWeb.ProductComponents do
             </div>
           <% end %>
 
+          <!-- Product details -->
+          <div class="stack" style="gap: var(--space-3); margin-bottom: var(--space-6);">
+            <div style="color: var(--color-text-primary);">
+              <strong style="font-weight: var(--font-semibold);">Brand:</strong>
+              <%= @editing_product.brand.name %>
+            </div>
+
+            <div style="color: var(--color-text-primary);">
+              <strong style="font-weight: var(--font-semibold);">Original Price:</strong>
+              $<%= format_price_cents(@editing_product.original_price_cents) %>
+              <%= if @editing_product.sale_price_cents do %>
+                <span style="margin-left: var(--space-4);">
+                  <strong style="font-weight: var(--font-semibold);">Sale Price:</strong>
+                  $<%= format_price_cents(@editing_product.sale_price_cents) %>
+                </span>
+              <% end %>
+            </div>
+
+            <div style="color: var(--color-text-secondary); font-size: var(--text-sm);">
+              <strong style="font-weight: var(--font-semibold); color: var(--color-text-primary);">Product ID:</strong>
+              <span style="font-family: monospace;"><%= @editing_product.pid %></span>
+            </div>
+
+            <%= if @editing_product.sku do %>
+              <div style="color: var(--color-text-secondary); font-size: var(--text-sm);">
+                <strong style="font-weight: var(--font-semibold); color: var(--color-text-primary);">SKU:</strong>
+                <span style="font-family: monospace;"><%= @editing_product.sku %></span>
+              </div>
+            <% end %>
+
+            <%= if @editing_product.description do %>
+              <div>
+                <strong style="font-weight: var(--font-semibold); color: var(--color-text-primary); display: block; margin-bottom: var(--space-2);">
+                  Description
+                </strong>
+                <div style="color: var(--color-text-secondary); line-height: 1.6;">
+                  <%= Phoenix.HTML.raw(@editing_product.description) %>
+                </div>
+              </div>
+            <% end %>
+          </div>
+
           <%= if @editing_product.product_variants && length(@editing_product.product_variants) > 0 do %>
             <.product_variants variants={@editing_product.product_variants} />
           <% end %>
 
-          <.form
-            id="edit-product-form"
-            for={@product_edit_form}
-            phx-change="validate_product"
-            phx-submit="save_product"
-            class="stack stack--lg"
-          >
-            <div class="stack">
-              <.input
-                field={@product_edit_form[:brand_id]}
-                type="select"
-                label="Brand"
-                options={Enum.map(@brands, fn b -> {b.name, b.id} end)}
-                prompt="Select a brand"
-              />
-
-              <.input
-                field={@product_edit_form[:name]}
-                type="text"
-                label="Product Name"
-                placeholder="e.g., Tennis Bracelet"
-              />
-
-              <.input
-                field={@product_edit_form[:description]}
-                type="textarea"
-                label="Description"
-                placeholder="Detailed product description"
-              />
-
+          <!-- Editable fields form -->
+          <div style="margin-top: var(--space-3);">
+            <strong style="font-weight: var(--font-semibold); color: var(--color-text-primary); display: block; margin-bottom: var(--space-2);">
+              Talking Points
+            </strong>
+            <.form
+              id="edit-product-form"
+              for={@product_edit_form}
+              phx-change="validate_product"
+              phx-submit="save_product"
+            >
               <.input
                 field={@product_edit_form[:talking_points_md]}
                 type="textarea"
-                label="Talking Points"
                 placeholder="- Point 1&#10;- Point 2&#10;- Point 3"
               />
-            </div>
-
-            <div class="stack">
-              <.input
-                field={@product_edit_form[:original_price_cents]}
-                type="number"
-                label="Original Price"
-                placeholder="e.g., 19.95"
-                step="0.01"
-              />
-
-              <.input
-                field={@product_edit_form[:sale_price_cents]}
-                type="number"
-                label="Sale Price (optional)"
-                placeholder="e.g., 14.95"
-                step="0.01"
-              />
-            </div>
-
-            <div class="stack">
-              <.input
-                field={@product_edit_form[:pid]}
-                type="text"
-                label="Product ID (PID)"
-                placeholder="External product ID"
-              />
-
-              <.input
-                field={@product_edit_form[:sku]}
-                type="text"
-                label="SKU"
-                placeholder="Stock keeping unit"
-              />
-            </div>
-          </.form>
+            </.form>
+          </div>
         </div>
 
         <div class="modal__footer">
@@ -413,6 +401,11 @@ defmodule HudsonWeb.ProductComponents do
     default: false,
     doc: "Whether to use dynamic ID based on search query (for URL-based search)"
 
+  attr :show_sync_button, :boolean, default: false, doc: "Whether to show sync button"
+  attr :last_sync_at, :any, default: nil, doc: "Last sync timestamp (DateTime)"
+  attr :syncing, :boolean, default: false, doc: "Whether sync is in progress"
+  attr :on_sync, :string, default: nil, doc: "Event to trigger on sync button click"
+
   def product_grid(assigns) do
     ~H"""
     <div class={["product-grid", "product-grid--#{@mode}"]}>
@@ -432,6 +425,27 @@ defmodule HudsonWeb.ProductComponents do
           <%= if @mode == :select do %>
             <div class="product-grid__count">
               ({MapSet.size(@selected_ids)} selected)
+            </div>
+          <% end %>
+          <%= if @show_sync_button do %>
+            <div class="product-grid__sync">
+              <button
+                type="button"
+                phx-click={@on_sync}
+                class={["button button--primary button--sm", @syncing && "button--disabled"]}
+                disabled={@syncing}
+              >
+                <%= if @syncing do %>
+                  Syncing...
+                <% else %>
+                  Initiate Shopify Sync
+                <% end %>
+              </button>
+              <%= if @last_sync_at do %>
+                <div class="product-grid__sync-meta">
+                  Last synced: {format_relative_time(@last_sync_at)}
+                </div>
+              <% end %>
             </div>
           <% end %>
         </div>

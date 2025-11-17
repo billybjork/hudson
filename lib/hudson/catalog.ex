@@ -226,7 +226,7 @@ defmodule Hudson.Catalog do
   end
 
   @doc """
-  Gets a product with images and variants preloaded.
+  Gets a product with brand, images, and variants preloaded.
   """
   def get_product_with_images!(id) do
     ordered_images = from(pi in ProductImage, order_by: [asc: pi.position])
@@ -234,7 +234,11 @@ defmodule Hudson.Catalog do
 
     Product
     |> where([p], p.id == ^id)
-    |> preload(product_images: ^ordered_images, product_variants: ^ordered_variants)
+    |> preload([
+      :brand,
+      product_images: ^ordered_images,
+      product_variants: ^ordered_variants
+    ])
     |> Repo.one!()
   end
 

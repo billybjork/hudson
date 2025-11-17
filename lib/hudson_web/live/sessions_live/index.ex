@@ -74,6 +74,7 @@ defmodule HudsonWeb.SessionsLive.Index do
     # Subscribe to session list changes for real-time updates across tabs
     if connected?(socket) do
       Phoenix.PubSub.subscribe(Hudson.PubSub, "sessions:list")
+      Phoenix.PubSub.subscribe(Hudson.PubSub, "shopify:sync")
     end
 
     sessions = Sessions.list_sessions_with_details()
@@ -151,6 +152,52 @@ defmodule HudsonWeb.SessionsLive.Index do
       socket
       |> assign(:sessions, sorted_sessions)
       |> assign(:previous_sessions, sorted_sessions)
+
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_info({:sync_started}, socket) do
+    socket =
+      socket
+      |> put_flash(:info, "Syncing product catalog from Shopify...")
+
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_info({:sync_completed, counts}, socket) do
+    # Reload sessions to pick up any product changes
+    expanded_id = socket.assigns.expanded_session_id
+    previous_sessions = socket.assigns.sessions
+    new_sessions = Sessions.list_sessions_with_details()
+
+    sorted_sessions =
+      sort_sessions_preserving_expanded(new_sessions, expanded_id, previous_sessions)
+
+    socket =
+      socket
+      |> assign(:sessions, sorted_sessions)
+      |> assign(:previous_sessions, sorted_sessions)
+      |> put_flash(
+        :info,
+        "Shopify sync complete: #{counts.products} products, #{counts.brands} brands, #{counts.images} images"
+      )
+
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_info({:sync_failed, reason}, socket) do
+    message =
+      case reason do
+        :rate_limited -> "Shopify sync paused due to rate limiting, will retry soon"
+        _ -> "Shopify sync failed: #{inspect(reason)}"
+      end
+
+    socket =
+      socket
+      |> put_flash(:error, message)
 
     {:noreply, socket}
   end
@@ -295,21 +342,21 @@ defmodule HudsonWeb.SessionsLive.Index do
       |> Session.changeset(params)
       |> Map.put(:action, :validate)
 
+    # If brand changed, reload products
     socket =
       socket
       |> assign(:session_form, to_form(changeset))
-
-    # If brand changed, reload products
-    socket =
-      if params["brand_id"] && params["brand_id"] != "" do
-        load_products_for_new_session(socket)
-      else
-        socket
-        |> stream(:new_session_products, [], reset: true)
-        |> assign(:new_session_has_more, false)
-        |> assign(:product_search_query, "")
-        |> assign(:selected_product_ids, MapSet.new())
-      end
+      |> then(fn socket ->
+        if params["brand_id"] && params["brand_id"] != "" do
+          load_products_for_new_session(socket)
+        else
+          socket
+          |> stream(:new_session_products, [], reset: true)
+          |> assign(:new_session_has_more, false)
+          |> assign(:product_search_query, "")
+          |> assign(:selected_product_ids, MapSet.new())
+        end
+      end)
 
     {:noreply, socket}
   end
@@ -317,7 +364,7 @@ defmodule HudsonWeb.SessionsLive.Index do
   @impl true
   def handle_event("save_session", %{"session" => session_params}, socket) do
     # Generate slug from name
-    slug = slugify(session_params["name"])
+    slug = Sessions.slugify(session_params["name"])
     session_params = Map.put(session_params, "slug", slug)
 
     # Extract selected product IDs (as list in order)
@@ -498,7 +545,11 @@ defmodule HudsonWeb.SessionsLive.Index do
     end
   end
 
-  def handle_event("reorder_products", %{"session_id" => session_id, "product_ids" => product_ids}, socket) do
+  def handle_event(
+        "reorder_products",
+        %{"session_id" => session_id, "product_ids" => product_ids},
+        socket
+      ) do
     session_id = normalize_id(session_id)
 
     # Convert product IDs to integers
@@ -512,7 +563,8 @@ defmodule HudsonWeb.SessionsLive.Index do
         previous_sessions = socket.assigns.sessions
         new_sessions = Sessions.list_sessions_with_details()
 
-        sorted_sessions = sort_sessions_preserving_expanded(new_sessions, expanded_id, previous_sessions)
+        sorted_sessions =
+          sort_sessions_preserving_expanded(new_sessions, expanded_id, previous_sessions)
 
         socket =
           socket
@@ -718,7 +770,7 @@ defmodule HudsonWeb.SessionsLive.Index do
   @impl true
   def handle_event("update_session", %{"session" => session_params}, socket) do
     # Generate slug from name
-    slug = slugify(session_params["name"])
+    slug = Sessions.slugify(session_params["name"])
     session_params = Map.put(session_params, "slug", slug)
 
     case Sessions.update_session(socket.assigns.editing_session, session_params) do
@@ -877,7 +929,7 @@ defmodule HudsonWeb.SessionsLive.Index do
 
       brand_id_str ->
         try do
-          brand_id = String.to_integer(brand_id_str)
+          brand_id = normalize_id(brand_id_str)
 
           result =
             Catalog.search_products_paginated(
@@ -939,7 +991,7 @@ defmodule HudsonWeb.SessionsLive.Index do
   defp maybe_expand_session(socket, nil), do: assign(socket, :expanded_session_id, nil)
 
   defp maybe_expand_session(socket, session_id_str) do
-    session_id = String.to_integer(session_id_str)
+    session_id = normalize_id(session_id_str)
     # Verify session exists before expanding
     if Enum.any?(socket.assigns.sessions, &(&1.id == session_id)) do
       assign(socket, :expanded_session_id, session_id)
@@ -964,18 +1016,6 @@ defmodule HudsonWeb.SessionsLive.Index do
     |> assign(:selected_product_ids, MapSet.new())
     |> stream(:new_session_products, [], reset: true)
     |> assign(:new_session_has_more, false)
-  end
-
-  defp slugify(name) do
-    slug =
-      name
-      |> String.downcase()
-      |> String.replace(~r/[^\w\s-]/, "")
-      |> String.replace(~r/\s+/, "-")
-      |> String.trim("-")
-
-    # Fallback for empty slugs
-    if slug == "", do: "session-#{:os.system_time(:second)}", else: slug
   end
 
   defp load_products_for_add_modal(socket, opts \\ [append: false]) do
@@ -1119,7 +1159,21 @@ defmodule HudsonWeb.SessionsLive.Index do
     end
   end
 
-  # Build sorted list by placing expanded session at its previous position and filling in the rest
+  # Builds a sorted session list while preserving the expanded session's position.
+  #
+  # This function maintains visual stability when reloading sessions by keeping
+  # the expanded session at its previous position in the list. Other sessions
+  # fill in around it based on their natural sort order.
+  #
+  # Parameters:
+  # - previous_sessions: The old session list (for position reference)
+  # - expanded_position: Index where the expanded session should be placed
+  # - expanded_id: ID of the currently expanded session
+  # - new_sessions_map: Map of session_id -> session struct for quick lookup
+  # - non_expanded_sessions: All other sessions in sort order
+  #
+  # Returns a list with the expanded session at its preserved position and
+  # other sessions filling in sequentially, with any new sessions appended.
   defp build_sorted_session_list(
          previous_sessions,
          expanded_position,

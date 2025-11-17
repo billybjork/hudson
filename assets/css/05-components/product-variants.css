@@ -1,18 +1,14 @@
 /* Product Variants Component */
 
 .product-variants {
-  margin-top: var(--space-6);
-  padding: var(--space-4);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  margin-top: var(--space-3);
 }
 
 .product-variants__title {
   font-size: var(--text-md);
   font-weight: var(--font-semibold);
   color: var(--color-text-primary);
-  margin-bottom: var(--space-3);
+  margin-bottom: var(--space-2);
 }
 
 .product-variants__list {

@@ -3,6 +3,31 @@ defmodule Hudson.Workers.ShopifySyncWorker do
   Oban worker that syncs Shopify product catalog to Hudson database.
 
   Runs hourly via cron to keep product data in sync.
+
+  ## Field Ownership Strategy
+
+  Product fields are categorized into two groups:
+
+  ### Shopify-Synced Fields (Overwritten on Each Sync)
+  These fields are automatically updated from Shopify API on every sync:
+  - `pid` - Shopify product ID
+  - `name` - Product title
+  - `description` - Product description (HTML)
+  - `original_price_cents` - Minimum variant price
+  - `sale_price_cents` - Minimum compare-at price
+  - `sku` - First variant SKU
+  - `brand_id` - Derived from product vendor
+
+  ### User-Editable Fields (Never Overwritten)
+  These fields are managed by users and never synced from Shopify:
+  - `talking_points_md` - Host talking points (set to nil during sync to preserve existing values)
+
+  ### Images and Variants
+  Product images and variants are fully replaced on each sync (DELETE all, INSERT new).
+  However, certain image fields are user-editable and preserved:
+  - `alt_text` - Custom accessibility text
+  - `thumbnail_path` - Custom thumbnail override
+  - `is_primary` - Primary image flag
   """
 
   use Oban.Worker, queue: :shopify, max_attempts: 3
@@ -10,11 +35,15 @@ defmodule Hudson.Workers.ShopifySyncWorker do
   require Logger
   alias Hudson.Catalog
   alias Hudson.Repo
+  alias Hudson.Settings
   alias Hudson.Shopify.Client
 
   @impl Oban.Worker
   def perform(%Oban.Job{}) do
     Logger.info("Starting Shopify product sync...")
+
+    # Broadcast sync start event
+    Phoenix.PubSub.broadcast(Hudson.PubSub, "shopify:sync", {:sync_started})
 
     case sync_all_products() do
       {:ok, counts} ->
@@ -25,14 +54,24 @@ defmodule Hudson.Workers.ShopifySyncWorker do
            - Images synced: #{counts.images}
         """)
 
+        # Update last sync timestamp
+        Settings.update_shopify_last_sync_at()
+
+        # Broadcast sync complete event
+        Phoenix.PubSub.broadcast(Hudson.PubSub, "shopify:sync", {:sync_completed, counts})
+
         :ok
 
       {:error, :rate_limited} ->
         Logger.warning("Rate limited by Shopify API, will retry")
+        # Broadcast sync failed event
+        Phoenix.PubSub.broadcast(Hudson.PubSub, "shopify:sync", {:sync_failed, :rate_limited})
         {:snooze, 60}
 
       {:error, reason} ->
         Logger.error("Shopify sync failed: #{inspect(reason)}")
+        # Broadcast sync failed event
+        Phoenix.PubSub.broadcast(Hudson.PubSub, "shopify:sync", {:sync_failed, reason})
         {:error, reason}
     end
   end
@@ -103,11 +142,12 @@ defmodule Hudson.Workers.ShopifySyncWorker do
       images = shopify_product["images"]["nodes"] || []
 
       # Build product attributes
+      # NOTE: We only include Shopify-synced fields here. User-editable fields like
+      # talking_points_md are intentionally omitted to preserve existing values.
       product_attrs = %{
         pid: shopify_product["id"],
         name: shopify_product["title"],
         description: shopify_product["descriptionHtml"],
-        talking_points_md: nil,
         original_price_cents: get_minimum_variant_price(variants),
         sale_price_cents: get_minimum_compare_at_price(variants),
         sku: get_first_variant_sku(variants),

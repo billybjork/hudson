@@ -55,10 +55,25 @@ export default {
     this.sortable = sortable
   },
 
-  // Cleanup when the element is removed from the DOM
+  // Cleanup when LiveView disconnects temporarily
+  disconnected() {
+    if (this.sortable) {
+      this.sortable.destroy()
+      this.sortable = null
+    }
+  },
+
+  // Reinitialize when LiveView reconnects
+  reconnected() {
+    // Re-mount the sortable on reconnection
+    this.mounted()
+  },
+
+  // Cleanup when the element is removed from the DOM permanently
   destroyed() {
     if (this.sortable) {
       this.sortable.destroy()
+      this.sortable = null
     }
   }
 }

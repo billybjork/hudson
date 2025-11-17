@@ -23,10 +23,19 @@ defmodule Hudson.Sessions do
   """
   def list_sessions_with_details do
     ordered_images = from(pi in ProductImage, order_by: [asc: pi.position])
+    ordered_variants = from(pv in ProductVariant, order_by: [asc: pv.position])
 
     Session
     |> order_by([s], desc: s.updated_at)
-    |> preload([:brand, session_products: [product: [product_images: ^ordered_images]]])
+    |> preload([
+      :brand,
+      session_products: [
+        product: [
+          product_images: ^ordered_images,
+          product_variants: ^ordered_variants
+        ]
+      ]
+    ])
     |> Repo.all()
   end
 
@@ -134,6 +143,10 @@ defmodule Hudson.Sessions do
     end)
   end
 
+  # Duplicates all session products from the source session to a new session.
+  # Copies all product associations including positions, overrides, and notes.
+  # Returns :ok if all products are duplicated successfully, or {:error, changeset}
+  # on the first failure. Uses reduce_while for early exit on error.
   defp duplicate_session_products(session_products, new_session_id) do
     session_products
     |> Enum.reduce_while(:ok, fn sp, _acc ->
@@ -161,6 +174,9 @@ defmodule Hudson.Sessions do
     ensure_unique_slug(base_slug, 0)
   end
 
+  # Recursively ensures a slug is unique by appending a numeric suffix if needed.
+  # On the first attempt (0), tries the base slug. If taken, appends -1, -2, etc.
+  # Returns the first available slug. Example: "my-session" -> "my-session-2"
   defp ensure_unique_slug(base_slug, attempt) do
     slug = if attempt == 0, do: base_slug, else: "#{base_slug}-#{attempt}"
 
@@ -170,7 +186,21 @@ defmodule Hudson.Sessions do
     end
   end
 
-  defp slugify(name) do
+  @doc """
+  Converts a name string into a URL-friendly slug.
+
+  Returns a lowercase string with spaces replaced by hyphens and special
+  characters removed. Falls back to a timestamp-based slug if the result is empty.
+
+  ## Examples
+
+      iex> Sessions.slugify("My Session Name")
+      "my-session-name"
+
+      iex> Sessions.slugify("@#$%")
+      "session-1234567890"
+  """
+  def slugify(name) do
     slug =
       name
       |> String.downcase()
@@ -219,7 +249,9 @@ defmodule Hudson.Sessions do
     ordered_variants = from(pv in ProductVariant, order_by: [asc: pv.position])
 
     SessionProduct
-    |> preload(product: [:brand, product_images: ^ordered_images, product_variants: ^ordered_variants])
+    |> preload(
+      product: [:brand, product_images: ^ordered_images, product_variants: ^ordered_variants]
+    )
     |> Repo.get!(id)
   end
 
@@ -264,6 +296,7 @@ defmodule Hudson.Sessions do
           {:ok, _} ->
             # Auto-renumber positions to fill gaps
             renumber_session_products(session_product.session_id)
+
             result
             |> broadcast_session_list_change()
 
@@ -279,50 +312,91 @@ defmodule Hudson.Sessions do
   Takes a session_id and a list of session_product IDs in the desired order.
   Updates the position field for each session_product efficiently using batch updates.
 
-  Returns {:ok, count} where count is the number of updated records.
+  Returns {:ok, count} where count is the number of updated records, or
+  {:error, reason} if validation fails.
   """
   def reorder_products(session_id, ordered_session_product_ids) do
-    result =
-      Repo.transaction(fn ->
-        # Step 1: Move all products to temporary positions to avoid constraint violations
-        # Use a high offset (10000) to ensure no conflicts with existing positions
-        ordered_session_product_ids
-        |> Enum.with_index(1)
-        |> Enum.each(fn {session_product_id, index} ->
-          temp_position = 10_000 + index
+    # Validate input
+    with {:ok, _session} <- validate_session_exists(session_id),
+         :ok <- validate_no_duplicates(ordered_session_product_ids),
+         {:ok, valid_ids} <-
+           validate_session_product_ownership(session_id, ordered_session_product_ids) do
+      # Proceed with reordering
+      result =
+        Repo.transaction(fn ->
+          # Step 1: Move all products to temporary positions to avoid constraint violations
+          # Use a high offset (10000) to ensure no conflicts with existing positions
+          valid_ids
+          |> Enum.with_index(1)
+          |> Enum.each(fn {session_product_id, index} ->
+            temp_position = 10_000 + index
 
-          from(sp in SessionProduct,
-            where: sp.id == ^session_product_id and sp.session_id == ^session_id
-          )
-          |> Repo.update_all(set: [position: temp_position])
-        end)
-
-        # Step 2: Update each product to its final position
-        count =
-          ordered_session_product_ids
-          |> Enum.with_index(1)  # Start positions at 1
-          |> Enum.map(fn {session_product_id, new_position} ->
             from(sp in SessionProduct,
               where: sp.id == ^session_product_id and sp.session_id == ^session_id
             )
-            |> Repo.update_all(set: [position: new_position])
-            |> elem(0)  # Returns {count, nil}, we want count
+            |> Repo.update_all(set: [position: temp_position])
           end)
-          |> Enum.sum()
 
-        # Touch the session to update its modified timestamp
-        touch_session(session_id)
+          # Step 2: Update each product to its final position
+          count =
+            valid_ids
+            # Start positions at 1
+            |> Enum.with_index(1)
+            |> Enum.map(fn {session_product_id, new_position} ->
+              from(sp in SessionProduct,
+                where: sp.id == ^session_product_id and sp.session_id == ^session_id
+              )
+              |> Repo.update_all(set: [position: new_position])
+              # Returns {count, nil}, we want count
+              |> elem(0)
+            end)
+            |> Enum.sum()
 
-        count
-      end)
+          # Touch the session to update its modified timestamp
+          touch_session(session_id)
 
-    case result do
-      {:ok, count} ->
-        broadcast_session_list_change({:ok, count})
-        {:ok, count}
+          count
+        end)
 
-      {:error, reason} ->
-        {:error, reason}
+      case result do
+        {:ok, count} ->
+          broadcast_session_list_change({:ok, count})
+          {:ok, count}
+
+        {:error, reason} ->
+          {:error, reason}
+      end
+    end
+  end
+
+  defp validate_session_exists(session_id) do
+    case Repo.get(Session, session_id) do
+      nil -> {:error, :session_not_found}
+      session -> {:ok, session}
+    end
+  end
+
+  defp validate_no_duplicates(ids) do
+    if length(ids) == length(Enum.uniq(ids)) do
+      :ok
+    else
+      {:error, :duplicate_ids}
+    end
+  end
+
+  defp validate_session_product_ownership(session_id, session_product_ids) do
+    # Query all session_products that match the provided IDs and belong to the session
+    valid_ids =
+      from(sp in SessionProduct,
+        where: sp.session_id == ^session_id and sp.id in ^session_product_ids,
+        select: sp.id
+      )
+      |> Repo.all()
+
+    if length(valid_ids) == length(session_product_ids) do
+      {:ok, session_product_ids}
+    else
+      {:error, :invalid_session_product_ids}
     end
   end
 
@@ -530,19 +604,27 @@ defmodule Hudson.Sessions do
       )
       |> Repo.all()
 
-    result =
-      Repo.transaction(fn ->
+    Repo.transaction(fn ->
+      # Update positions sequentially, starting from 1
+      updated_count =
         session_products
         |> Enum.with_index(1)
-        |> Enum.each(&update_session_product_position/1)
-      end)
+        |> Enum.reduce(0, fn {sp, new_position}, acc ->
+          case update_session_product_position({sp, new_position}) do
+            :ok -> acc
+            _ -> acc + 1
+          end
+        end)
 
-    case result do
-      {:ok, _} -> touch_session(session_id)
-      error -> error
+      # Touch session to update its timestamp
+      touch_session(session_id)
+
+      {:ok, updated_count}
+    end)
+    |> case do
+      {:ok, {:ok, count}} -> {:ok, count}
+      {:error, reason} -> {:error, reason}
     end
-
-    result
   end
 
   defp update_session_product_position({sp, new_position}) when sp.position != new_position do

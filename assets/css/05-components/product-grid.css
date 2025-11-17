@@ -47,6 +47,19 @@
   font-size: var(--text-base);
 }
 
+.product-grid__sync {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-1);
+}
+
+.product-grid__sync-meta {
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  font-weight: var(--font-normal);
+}
+
 /* ============================================================================
    SELECT MODE - For product selection (modal, smaller cards)
    ============================================================================ */
@@ -282,9 +295,15 @@ infinite-scroll-trigger {
     min-width: 300px;
   }
 
+  .product-grid--browse .product-grid__header {
+    flex-direction: row;
+    align-items: flex-start;
+    justify-content: space-between;
+  }
+
   .product-grid--browse .product-grid__search {
-    width: auto;
-    max-width: 400px;
+    flex: 1;
+    max-width: 530px;
   }
 
   .product-grid--browse .product-grid__grid {

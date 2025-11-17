@@ -717,6 +717,12 @@ defmodule HudsonWeb.CoreComponents do
   """
   def format_relative_time(nil), do: "Never"
 
+  def format_relative_time(%DateTime{} = datetime) do
+    datetime
+    |> DateTime.to_naive()
+    |> format_relative_time()
+  end
+
   def format_relative_time(%NaiveDateTime{} = datetime) do
     now = NaiveDateTime.utc_now()
     diff_seconds = NaiveDateTime.diff(now, datetime, :second)

@@ -28,8 +28,10 @@
 }
 
 .input:disabled {
-  opacity: 0.5;
+  opacity: 0.6;
   cursor: not-allowed;
+  background-color: var(--color-surface-secondary);
+  color: var(--color-text-secondary);
 }
 
 .input--error {
@@ -77,6 +79,13 @@
   border-color: var(--color-border-focus);
 }
 
+.select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background-color: var(--color-surface-secondary);
+  color: var(--color-text-secondary);
+}
+
 /* Textarea */
 .textarea {
   width: 100%;
@@ -99,6 +108,14 @@
   outline: 2px solid var(--color-border-focus);
   outline-offset: 2px;
   border-color: var(--color-border-focus);
+}
+
+.textarea:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background-color: var(--color-surface-secondary);
+  color: var(--color-text-secondary);
+  resize: none;
 }
 
 /* Error message */

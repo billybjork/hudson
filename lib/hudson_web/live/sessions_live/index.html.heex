@@ -59,7 +59,9 @@
                   class="menu-trigger"
                   aria-label="Session actions"
                   aria-haspopup="true"
-                  phx-click={JS.toggle(to: "#session-menu-#{session.id}", in: "fade-in", out: "fade-out")}
+                  phx-click={
+                    JS.toggle(to: "#session-menu-#{session.id}", in: "fade-in", out: "fade-out")
+                  }
                 >
                   ⋮
                 </button>
@@ -68,7 +70,9 @@
                   id={"session-menu-#{session.id}"}
                   class="session-menu"
                   style="display: none;"
-                  phx-click-away={JS.hide(to: "#session-menu-#{session.id}", transition: "fade-out")}
+                  phx-click-away={
+                    JS.hide(to: "#session-menu-#{session.id}", transition: "fade-out")
+                  }
                   role="menu"
                 >
                   <button
@@ -80,8 +84,7 @@
                     }
                     phx-value-session-id={session.id}
                   >
-                    <.icon name="hero-pencil" class="size-4" />
-                    Edit
+                    <.icon name="hero-pencil" class="size-4" /> Edit
                   </button>
 
                   <button
@@ -93,8 +96,7 @@
                     }
                     phx-value-session-id={session.id}
                   >
-                    <.icon name="hero-document-duplicate" class="size-4" />
-                    Duplicate
+                    <.icon name="hero-document-duplicate" class="size-4" /> Duplicate
                   </button>
 
                   <div class="session-menu__divider"></div>
@@ -109,8 +111,7 @@
                     phx-value-session-id={session.id}
                     data-confirm="Are you sure you want to delete this session? This action cannot be undone."
                   >
-                    <.icon name="hero-trash" class="size-4" />
-                    Delete
+                    <.icon name="hero-trash" class="size-4" /> Delete
                   </button>
                 </nav>
               </div>
@@ -257,9 +258,7 @@
         phx-disable-with="Adding..."
         disabled={MapSet.size(@add_product_selected_ids) == 0}
       >
-        Add {MapSet.size(@add_product_selected_ids)} Product<%= if MapSet.size(@add_product_selected_ids) != 1 do %>
-          s
-        <% end %>
+        Add {MapSet.size(@add_product_selected_ids)} Product<%= if MapSet.size(@add_product_selected_ids) != 1 do %>s<% end %>
       </.button>
     </div>
   </.modal>
@@ -310,8 +309,8 @@
       
 <!-- Product Selection Section (outside the form) -->
       <%= if @session_form.params["brand_id"] && @session_form.params["brand_id"] != "" do %>
-        <div class="stack" style="margin-top: var(--space-6);">
-          <h3 style="font-size: 0.875rem; font-weight: 600; margin-bottom: var(--space-2);">
+        <div class="stack product-selection-section">
+          <h3 class="product-selection-heading">
             Select Products
           </h3>
           <.product_grid
@@ -329,7 +328,7 @@
           />
         </div>
       <% else %>
-        <p class="text-sm text-secondary" style="margin-top: var(--space-4);">
+        <p class="text-sm text-secondary product-selection-placeholder">
           Please select a brand to choose products.
         </p>
       <% end %>

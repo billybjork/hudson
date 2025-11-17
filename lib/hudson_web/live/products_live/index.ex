@@ -5,17 +5,26 @@ defmodule HudsonWeb.ProductsLive.Index do
 
   alias Hudson.Catalog
   alias Hudson.Catalog.Product
+  alias Hudson.Settings
 
   import HudsonWeb.ProductComponents
   import HudsonWeb.ViewHelpers
 
   @impl true
   def mount(_params, _session, socket) do
+    # Subscribe to Shopify sync events
+    if connected?(socket) do
+      Phoenix.PubSub.subscribe(Hudson.PubSub, "shopify:sync")
+    end
+
     brands = Catalog.list_brands()
+    last_sync_at = Settings.get_shopify_last_sync_at()
 
     socket =
       socket
       |> assign(:brands, brands)
+      |> assign(:last_sync_at, last_sync_at)
+      |> assign(:syncing, false)
       |> assign(:editing_product, nil)
       |> assign(:product_edit_form, to_form(Product.changeset(%Product{}, %{})))
       |> assign(:current_edit_image_index, 0)
@@ -36,6 +45,64 @@ defmodule HudsonWeb.ProductsLive.Index do
       socket
       |> apply_url_params(params)
       |> apply_search_params(params)
+
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_info({:sync_started}, socket) do
+    socket =
+      socket
+      |> assign(:syncing, true)
+      |> put_flash(:info, "Syncing product catalog from Shopify...")
+
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_info({:sync_completed, _counts}, socket) do
+    # Reload products and update last sync timestamp
+    last_sync_at = Settings.get_shopify_last_sync_at()
+
+    socket =
+      socket
+      |> assign(:syncing, false)
+      |> assign(:last_sync_at, last_sync_at)
+      |> assign(:product_page, 1)
+      |> assign(:loading_products, true)
+      |> load_products_for_browse()
+      |> put_flash(:info, "Shopify sync completed successfully")
+
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_info({:sync_failed, reason}, socket) do
+    message =
+      case reason do
+        :rate_limited -> "Shopify sync paused due to rate limiting, will retry soon"
+        _ -> "Shopify sync failed"
+      end
+
+    socket =
+      socket
+      |> assign(:syncing, false)
+      |> put_flash(:error, message)
+
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_event("trigger_shopify_sync", _params, socket) do
+    # Enqueue a Shopify sync job
+    %{}
+    |> Hudson.Workers.ShopifySyncWorker.new()
+    |> Oban.insert()
+
+    socket =
+      socket
+      |> assign(:syncing, true)
+      |> put_flash(:info, "Shopify sync initiated...")
 
     {:noreply, socket}
   end

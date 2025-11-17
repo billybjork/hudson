@@ -50,6 +50,21 @@
   gap: var(--space-4);
 }
 
+/* Product selection section */
+.product-selection-section {
+  margin-top: var(--space-6);
+}
+
+.product-selection-heading {
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin-bottom: var(--space-2);
+}
+
+.product-selection-placeholder {
+  margin-top: var(--space-4);
+}
+
 /* Responsive adjustments */
 @media (min-width: 768px) {
   .session-layout {

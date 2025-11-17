@@ -18,6 +18,10 @@
       @products_has_more && !@loading_products && @product_search_query == "" &&
         "load_more_products"
     }
+    show_sync_button={true}
+    last_sync_at={@last_sync_at}
+    syncing={@syncing}
+    on_sync="trigger_shopify_sync"
   />
 
   <.product_edit_modal
