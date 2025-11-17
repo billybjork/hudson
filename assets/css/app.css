@@ -39,6 +39,7 @@
 @import "./05-components/navbar.css";
 @import "./05-components/flash.css";
 @import "./05-components/image-carousel.css";
+@import "./05-components/theme-toggle.css";
 
 /* Utilities Layer - Utility classes */
 @import "./06-utilities/utilities.css";

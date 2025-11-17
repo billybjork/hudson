@@ -1,0 +1,126 @@
+/* ============================================================================
+   THEME TOGGLE COMPONENT
+   ============================================================================ */
+
+/**
+ * Theme toggle button for switching between light and dark modes.
+ * Uses sun/moon emoji icons that show/hide based on current theme.
+ */
+
+/* Theme toggle button */
+.theme-toggle {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  background-color: transparent;
+  border: 1px solid var(--color-border-primary);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: background-color 200ms ease, border-color 200ms ease, transform 150ms ease;
+}
+
+.theme-toggle:hover {
+  background-color: var(--color-bg-hover);
+  border-color: var(--color-border-focus);
+}
+
+.theme-toggle:active {
+  transform: scale(0.95);
+}
+
+.theme-toggle:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+}
+
+/* Icon container */
+.theme-toggle__icon {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.125rem;
+  line-height: 1;
+  transition: opacity 200ms ease, transform 200ms ease;
+  color: var(--color-text-primary);
+}
+
+/* Sun icon - visible in LIGHT mode (shows current mode) */
+.theme-toggle__icon--sun {
+  opacity: 1;
+  transform: rotate(0deg) scale(1.4);
+}
+
+.dark .theme-toggle__icon--sun {
+  opacity: 0;
+  transform: rotate(90deg) scale(0.8);
+}
+
+/* Moon icon - visible in DARK mode (shows current mode) */
+.theme-toggle__icon--moon {
+  opacity: 0;
+  transform: rotate(-90deg) scale(0.8);
+}
+
+.dark .theme-toggle__icon--moon {
+  opacity: 1;
+  transform: rotate(0deg) scale(1);
+}
+
+/* Screen reader only text */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* ============================================================================
+   GLOBAL THEME TRANSITIONS
+   ============================================================================ */
+
+/**
+ * Smooth color transitions when switching themes.
+ * Applied to all elements that use theme-dependent colors.
+ */
+
+/* Transition for color properties */
+*,
+*::before,
+*::after {
+  transition-property: color, background-color, border-color, box-shadow, fill, stroke;
+  transition-duration: 200ms;
+  transition-timing-function: ease;
+}
+
+/* Disable transitions on initial page load to prevent flash */
+.preload * {
+  transition: none !important;
+}
+
+/* Specific elements that should not transition */
+.no-transition,
+.no-transition * {
+  transition: none !important;
+}
+
+/* Elements with their own transitions (don't override) */
+button,
+a,
+input,
+textarea,
+select,
+[role="button"] {
+  /* These elements have specific transitions defined in their component CSS */
+  /* Color transitions are added on top of existing transitions */
+  transition-property: color, background-color, border-color, box-shadow, transform, opacity;
+}

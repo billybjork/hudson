@@ -12,6 +12,7 @@ defmodule HudsonWeb.SessionProducerLive do
   on_mount {HudsonWeb.NavHooks, :set_current_page}
 
   import HudsonWeb.ViewHelpers
+  import HudsonWeb.ThemeComponents
 
   alias Hudson.Sessions
   alias Hudson.Sessions.SessionProduct

@@ -36,11 +36,19 @@ a.button:hover {
 /* Variants */
 .button--primary {
   background-color: var(--color-accent-blue);
-  color: white;
+  color: #ffffff; /* Always white, regardless of theme */
 }
 
 .button--primary:hover:not(:disabled) {
-  background-color: #2563eb;
+  background-color: var(--color-accent-blue-hover);
+  color: #ffffff; /* Keep white on hover */
+}
+
+/* Ensure links with primary button class have white text */
+a.button--primary,
+a.button--primary:hover,
+a.button--primary:visited {
+  color: #ffffff; /* Always white for primary button links */
 }
 
 .button--success {
@@ -49,7 +57,7 @@ a.button:hover {
 }
 
 .button--success:hover:not(:disabled) {
-  background-color: #22c55e;
+  background-color: var(--color-accent-green-hover);
 }
 
 .button--error {
@@ -58,7 +66,7 @@ a.button:hover {
 }
 
 .button--error:hover:not(:disabled) {
-  background-color: #dc2626;
+  background-color: var(--color-accent-red-hover);
 }
 
 .button--ghost {

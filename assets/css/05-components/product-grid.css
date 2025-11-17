@@ -112,10 +112,10 @@
   justify-content: center;
   width: 24px;
   height: 24px;
-  background-color: #10b981;
+  background-color: var(--color-accent-green);
   color: white;
   border-radius: 50%;
-  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.4);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--color-accent-green) 40%, transparent);
   font-weight: bold;
   transition: opacity var(--transition-fast);
 }
@@ -239,7 +239,7 @@
 }
 
 .product-card-browse__price-sale {
-  color: #ef4444;
+  color: var(--color-accent-red);
   font-weight: var(--font-semibold);
 }
 

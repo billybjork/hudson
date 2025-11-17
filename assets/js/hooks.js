@@ -5,13 +5,15 @@ import ConnectionStatus from "./hooks/connection_status"
 import ImageCarouselDrag from "./hooks/image_carousel_drag"
 import ProductEditModalKeyboard from "./hooks/product_edit_modal_keyboard"
 import ProductSortable from "./hooks/product_sortable"
+import ThemeToggle from "./hooks/theme_toggle"
 
 const Hooks = {
   SessionHostKeyboard,
   ConnectionStatus,
   ImageCarouselDrag,
   ProductEditModalKeyboard,
-  ProductSortable
+  ProductSortable,
+  ThemeToggle
 }
 
 export default Hooks

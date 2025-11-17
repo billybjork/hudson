@@ -25,6 +25,8 @@ defmodule HudsonWeb.CoreComponents do
   alias Phoenix.HTML.{Form, FormField}
   alias Phoenix.LiveView.JS
 
+  import HudsonWeb.ThemeComponents
+
   # Verified routes for navigation
   use Phoenix.VerifiedRoutes,
     endpoint: HudsonWeb.Endpoint,
@@ -348,6 +350,7 @@ defmodule HudsonWeb.CoreComponents do
         >
           New Session
         </.button>
+        <.theme_toggle />
       </div>
     </nav>
     """
