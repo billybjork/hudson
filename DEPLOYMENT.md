@@ -1,6 +1,29 @@
 # Hudson Desktop Deployment (Tauri + Phoenix)
 
-A revised plan to ship Hudson as a cross‑platform desktop app using **Tauri** as the shell, while keeping the existing **Phoenix/LiveView** UI and adding a **SQLite + Neon** hybrid data layer plus media caching. This addresses the gaps in `DEPLOYMENT.md` (env bootstrapping, credentials, updates, NIF/toolchain, offline tolerance, signing).
+A revised plan to ship Hudson as a cross‑platform desktop app using **Tauri** as the shell, while keeping the existing **Phoenix/LiveView** UI and adding a **SQLite + Neon** hybrid data layer plus media caching.
+
+## ⚠️ Current State vs Future State
+
+**This document describes the TARGET architecture.** Most components described here **do not exist yet** and need to be built. See the [Migration Checklist](#migration-checklist) section for concrete changes to existing code.
+
+### What Exists Today (2025-01-17)
+- ✅ Phoenix LiveView app running locally on PostgreSQL
+- ✅ Shopify & OpenAI API integrations
+- ✅ esbuild asset pipeline (no npm)
+- ✅ Oban background jobs
+- ✅ Basic runtime.exs configuration (dev-mode focused)
+
+### What This Plan Adds
+- ❌ Tauri desktop shell (not started)
+- ❌ Burrito single-binary packaging (not configured)
+- ❌ SQLite local cache + sync queue (not implemented)
+- ❌ OS keychain/DPAPI credential storage (not implemented)
+- ❌ First-run friendly bootstrap (runtime.exs needs changes)
+- ❌ Media cache system (not implemented)
+- ❌ Auto-update mechanism (not implemented)
+- ❌ CI/CD pipeline with code signing (not configured)
+
+**Before following this guide:** Complete the [Migration Checklist](#migration-checklist) to update existing code, then proceed with implementation phases.
 
 ## Goals
 - Preserve current LiveView UI; avoid template rewrites.
@@ -114,14 +137,256 @@ A revised plan to ship Hudson as a cross‑platform desktop app using **Tauri** 
   - Local SQLite Repo + auto-migration run on startup (empty schema) to confirm migration path.
   - Manual start/stop: confirm Tauri cleanly terminates BEAM.
 
+## Migration Checklist
+
+**These changes must be made to existing files BEFORE starting the implementation phases.**
+
+### 1. Update `config/runtime.exs` for Desktop Bootstrap
+
+**Current Issues:**
+- Lines 45-50: Raises on missing `DATABASE_URL` (blocks first run)
+- Lines 66-71: Raises on missing `SECRET_KEY_BASE` (blocks first run)
+- Lines 94-100: Binds to `0.0.0.0` (exposes port publicly)
+- Line 40-42: Requires `PHX_SERVER=true` env var
+
+**Required Changes:**
+
+```diff
+# config/runtime.exs
+
+if config_env() == :prod do
++  # First-run friendly: load from secure storage or use defaults
++  database_url = Hudson.SecureStorage.get("neon_url") ||
++    System.get_env("DATABASE_URL") ||
++    nil  # Will be set via first-run wizard
++
+-  database_url =
+-    System.get_env("DATABASE_URL") ||
+-      raise """
+-      environment variable DATABASE_URL is missing.
+-      For example: ecto://USER:PASS@HOST/DATABASE
+-      """
+
++  # Generate and persist secret_key_base on first run
++  secret_key_base = Hudson.SecureStorage.get("secret_key_base") ||
++    System.get_env("SECRET_KEY_BASE") ||
++    generate_and_store_secret()
++
+-  secret_key_base =
+-    System.get_env("SECRET_KEY_BASE") ||
+-      raise """
+-      environment variable SECRET_KEY_BASE is missing.
+-      You can generate one by calling: mix phx.gen.secret
+-      """
+
++  # Desktop mode: always enable server, bind to loopback, random port
++  config :hudson, HudsonWeb.Endpoint, server: true
++
+-  if System.get_env("PHX_SERVER") do
+-    config :hudson, HudsonWeb.Endpoint, server: true
+-  end
+
++  # Pick random available port, write to handshake file for Tauri
++  port = pick_available_port()
++  write_port_handshake(port)
++
+-  port = String.to_integer(System.get_env("PORT") || "4000")
+
+  config :hudson, HudsonWeb.Endpoint,
+    url: [host: host, port: port],
+    http: [
+-      ip: {0, 0, 0, 0, 0, 0, 0, 0},
++      ip: {127, 0, 0, 1},  # Localhost only for desktop
+      port: port
+    ],
+    secret_key_base: secret_key_base
+end
+
++# Helper functions
++defp generate_and_store_secret do
++  secret = :crypto.strong_rand_bytes(64) |> Base.encode64()
++  Hudson.SecureStorage.put("secret_key_base", secret)
++  secret
++end
++
++defp pick_available_port do
++  {:ok, socket} = :gen_tcp.listen(0, [:binary, active: false, reuseaddr: true])
++  {:ok, port} = :inet.port(socket)
++  :gen_tcp.close(socket)
++  port
++end
++
++defp write_port_handshake(port) do
++  handshake_path = case :os.type() do
++    {:unix, :darwin} -> "/tmp/hudson_port.json"
++    {:win32, _} -> Path.join(System.get_env("APPDATA"), "Hudson/port.json")
++  end
++  File.mkdir_p!(Path.dirname(handshake_path))
++  File.write!(handshake_path, Jason.encode!(%{port: port}))
++end
+```
+
+### 2. Add Missing Dependencies to `mix.exs`
+
+**These dependencies are referenced in the plan but not yet added:**
+
+```diff
+# mix.exs
+defp deps do
+  [
+    # ... existing deps
++    # Desktop deployment
++    {:burrito, "~> 1.5", runtime: false},
++    {:ecto_sqlite3, "~> 0.9"},
++    # Secure storage (choose one approach)
++    # Option A: Use existing Rust via Port/NIF (implement in Tauri)
++    # Option B: Pure Elixir file-based with envelope encryption (fallback)
+  ]
+end
+
++defp releases do
++  [
++    hudson: [
++      steps: [:assemble, &Burrito.wrap/1],
++      burrito: [
++        targets: [
++          macos_arm: [os: :darwin, cpu: :aarch64],
++          macos_intel: [os: :darwin, cpu: :x86_64],
++          windows: [os: :windows, cpu: :x86_64]
++        ]
++      ]
++    ]
++  ]
++end
+```
+
+### 3. Add Health Check Endpoint
+
+**Create new controller for Tauri readiness checks:**
+
+```elixir
+# lib/hudson_web/controllers/health_controller.ex
+defmodule HudsonWeb.HealthController do
+  use HudsonWeb, :controller
+
+  def check(conn, _params) do
+    # Basic health check - can expand to check DB, etc.
+    json(conn, %{status: "ok", timestamp: DateTime.utc_now()})
+  end
+end
+
+# lib/hudson_web/router.ex (add route)
+scope "/", HudsonWeb do
+  pipe_through :browser
+  get "/healthz", HealthController, :check  # No auth required
+  # ... existing routes
+end
+```
+
+### 4. Create Placeholder Scripts
+
+**These scripts are referenced in CI/CD but don't exist yet:**
+
+```bash
+# scripts/build_sidecar.sh
+#!/bin/bash
+set -e
+echo "Building BEAM sidecar with Burrito..."
+MIX_ENV=prod mix deps.get --only prod
+MIX_ENV=prod mix assets.deploy
+MIX_ENV=prod mix release
+echo "Sidecar built: burrito_out/"
+ls -lh burrito_out/
+
+# scripts/link_binaries.sh
+#!/bin/bash
+TARGET=$1
+if [ -z "$TARGET" ]; then
+  echo "Usage: $0 <target-triple>"
+  exit 1
+fi
+
+BURRITO_BIN="burrito_out/hudson_${TARGET//-/_}"
+if [[ "$TARGET" == *"windows"* ]]; then
+  BURRITO_BIN="${BURRITO_BIN}.exe"
+fi
+
+TAURI_SIDECAR="src-tauri/binaries/hudson_backend-${TARGET}"
+if [[ "$TARGET" == *"windows"* ]]; then
+  TAURI_SIDECAR="${TAURI_SIDECAR}.exe"
+fi
+
+mkdir -p $(dirname "$TAURI_SIDECAR")
+ln -sf "../../${BURRITO_BIN}" "$TAURI_SIDECAR"
+echo "Linked: $BURRITO_BIN -> $TAURI_SIDECAR"
+```
+
+**Make them executable:**
+```bash
+chmod +x scripts/*.sh
+```
+
+### 5. Add `.gitignore` Entries
+
+```gitignore
+# Desktop build artifacts
+/burrito_out/
+/src-tauri/target/
+/src-tauri/binaries/
+*.dmg
+*.msi
+*.pkg
+```
+
+### 6. Create Tauri Workspace (Prerequisite)
+
+**This must be done before CI/CD will work:**
+
+```bash
+# Install Tauri CLI
+cargo install tauri-cli
+
+# Initialize Tauri project
+cargo tauri init
+# Answer prompts:
+#   - App name: Hudson
+#   - Window title: Hudson Live Session Controller
+#   - Web assets location: ../priv/static
+#   - Dev server URL: http://localhost:4000
+#   - Frontend dev command: (leave empty)
+#   - Frontend build command: mix assets.deploy
+```
+
+**Then configure `src-tauri/tauri.conf.json` for sidecar:**
+
+```json
+{
+  "build": {
+    "beforeBuildCommand": "",
+    "beforeDevCommand": "",
+    "devPath": "http://localhost:4000",
+    "distDir": "../priv/static"
+  },
+  "tauri": {
+    "bundle": {
+      "identifier": "com.pavoi.hudson",
+      "externalBin": [
+        "binaries/hudson_backend"
+      ]
+    }
+  }
+}
+```
+
 ## Action Items (initial cut)
-- Add Tauri workspace + Rust bootstrap to spawn BEAM and load LiveView URL.
-- Update `config/runtime.exs` to first-run-friendly boot (no required env raises), random loopback port, secure secret storage hook, health endpoint.
-- Introduce SQLite cache schema + sync queue scaffolding; keep Neon migrations CI-only.
-- Implement Req-based media cache with TTL/LRU.
-- Wire Tauri updater with signature verification and rollback; add release signing keys to CI secrets.
-- Add diagnostics UI + offline/online indicators.
-- Validate bcrypt/lazy_html NIF loading per target in CI.
+- ✅ Complete Migration Checklist (update existing files)
+- ❌ Add Tauri workspace + Rust bootstrap to spawn BEAM and load LiveView URL.
+- ❌ Update `config/runtime.exs` to first-run-friendly boot (see Migration Checklist #1)
+- ❌ Introduce SQLite cache schema + sync queue scaffolding; keep Neon migrations CI-only.
+- ❌ Implement Req-based media cache with TTL/LRU.
+- ❌ Wire Tauri updater with signature verification and rollback; add release signing keys to CI secrets.
+- ❌ Add diagnostics UI + offline/online indicators.
+- ❌ Validate bcrypt/lazy_html NIF loading per target in CI.
 
 ## Timeline & Effort Estimation
 
@@ -170,21 +435,30 @@ cargo install cargo-xwin
 
 ### Elixir Dependencies (add to mix.exs)
 
+**⚠️ These dependencies DO NOT exist in the current `mix.exs` and must be added:**
+
 ```elixir
 defp deps do
   [
     # ... existing deps
-    {:burrito, "~> 1.5", runtime: false},
-    {:ecto_sqlite3, "~> 0.9"},
-    {:req, "~> 0.5"},  # Already present
-    # Secure storage adapters
-    {:ex_os_keychain, "~> 0.1"},  # macOS keychain (if available)
-    # OR build custom Rust NIF/Port bridge
+    {:burrito, "~> 1.5", runtime: false},  # ❌ Not yet added
+    {:ecto_sqlite3, "~> 0.9"},             # ❌ Not yet added
+    {:req, "~> 0.5"},                      # ✅ Already present
+    # Secure storage adapters (choose approach in Phase 3)
+    # Option A: Use Tauri Rust bridge via Port (recommended)
+    # Option B: {:ex_os_keychain, "~> 0.1"} for pure Elixir macOS
+    # Option C: File-based envelope encryption (fallback)
   ]
 end
 ```
 
+See [Migration Checklist #2](#2-add-missing-dependencies-to-mixexs) for full changes.
+
 ### Rust Dependencies (Cargo.toml in src-tauri/)
+
+**⚠️ The `src-tauri/` directory does not exist yet.** Create it first via [Migration Checklist #6](#6-create-tauri-workspace-prerequisite).
+
+**After Tauri initialization, add these dependencies:**
 
 ```toml
 [dependencies]
@@ -194,54 +468,66 @@ serde_json = "1.0"
 tokio = { version = "1", features = ["full"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
-security-framework = "2.9"  # For keychain access
+security-framework = "2.9"  # For keychain access (if implementing secure storage in Rust)
 
 [target.'cfg(target_os = "windows")'.dependencies]
-windows = { version = "0.51", features = ["Win32_Security_Credentials"] }
+windows = { version = "0.51", features = ["Win32_Security_Credentials"] }  # For DPAPI
 ```
 
 ## Project File Structure
 
+**Legend:** ✅ = Exists today | ❌ = Needs to be created | 🔄 = Needs updates
+
 ```
 hudson/
-├── lib/
-│   ├── hudson/
-│   │   ├── sync/              # NEW: SQLite ↔ Neon sync queue
+├── lib/                                      ✅
+│   ├── hudson/                               ✅
+│   │   ├── sync/                             ❌ SQLite ↔ Neon sync queue
 │   │   │   ├── queue.ex
 │   │   │   ├── reconciler.ex
 │   │   │   └── conflict_resolver.ex
-│   │   ├── cache/             # NEW: Media cache
+│   │   ├── cache/                            ❌ Media cache
 │   │   │   ├── media_cache.ex
 │   │   │   └── lru_store.ex
-│   │   ├── secure_storage.ex  # NEW: Keychain/DPAPI adapter
-│   │   ├── local_repo.ex      # NEW: SQLite Repo
-│   │   └── release.ex         # NEW: Migration runner
-│   └── hudson_web/
+│   │   ├── secure_storage.ex                 ❌ Keychain/DPAPI adapter
+│   │   ├── local_repo.ex                     ❌ SQLite Repo
+│   │   └── release.ex                        ❌ Migration runner
+│   └── hudson_web/                           ✅
+│       ├── controllers/
+│       │   └── health_controller.ex          ❌ For /healthz endpoint
 │       └── live/
-│           ├── settings_live/ # UPDATED: Add credentials UI
-│           └── diagnostics_live/ # NEW: Health/sync dashboard
-├── priv/
+│           ├── settings_live/                🔄 Add credentials UI
+│           └── diagnostics_live/             ❌ Health/sync dashboard
+├── priv/                                     ✅
 │   └── repo/
-│       ├── migrations/        # Neon (CI-run only)
-│       └── local_migrations/  # NEW: SQLite (client-run)
-├── src-tauri/                 # NEW: Tauri Rust project
+│       ├── migrations/                       ✅ Neon (CI-run only)
+│       └── local_migrations/                 ❌ SQLite (client-run)
+├── src-tauri/                                ❌ Tauri Rust project (entire directory)
 │   ├── src/
-│   │   ├── main.rs           # Window setup, sidecar lifecycle
-│   │   ├── backend.rs        # BEAM process management
-│   │   └── secure_storage.rs # Keychain/DPAPI bridge (optional)
-│   ├── tauri.conf.json
-│   └── Cargo.toml
-├── config/
-│   └── runtime.exs            # UPDATED: First-run friendly
-├── .github/
+│   │   ├── main.rs                           ❌ Window setup, sidecar lifecycle
+│   │   ├── backend.rs                        ❌ BEAM process management
+│   │   └── secure_storage.rs                 ❌ Keychain/DPAPI bridge (optional)
+│   ├── tauri.conf.json                       ❌
+│   └── Cargo.toml                            ❌
+├── config/                                   ✅
+│   └── runtime.exs                           🔄 First-run friendly (see Migration Checklist #1)
+├── .github/                                  ✅
 │   └── workflows/
-│       └── release.yml        # NEW: CI/CD pipeline
-└── scripts/
-    ├── build_sidecar.sh       # Burrito build wrapper
-    └── link_binaries.sh       # Symlink burrito_out → src-tauri
+│       └── release.yml                       ❌ CI/CD pipeline
+└── scripts/                                  ✅
+    ├── build_sidecar.sh                      ❌ Burrito build wrapper
+    └── link_binaries.sh                      ❌ Symlink burrito_out → src-tauri
 ```
 
 ## CI/CD Pipeline (GitHub Actions)
+
+**⚠️ IMPORTANT: This workflow is ILLUSTRATIVE and will not work until:**
+1. ✅ Tauri workspace exists (`src-tauri/` directory) - see [Migration Checklist #6](#6-create-tauri-workspace-prerequisite)
+2. ✅ Build scripts exist (`scripts/build_sidecar.sh`, `scripts/link_binaries.sh`) - see [Migration Checklist #4](#4-create-placeholder-scripts)
+3. ✅ Burrito configured in `mix.exs` - see [Migration Checklist #2](#2-add-missing-dependencies-to-mixexs)
+4. ✅ Apple certificates added to GitHub Secrets (if deploying macOS)
+
+**Do not push a tag to trigger this workflow until prerequisites are complete.**
 
 ```yaml
 # .github/workflows/release.yml
@@ -476,18 +762,36 @@ end
 ```elixir
 # config/runtime.exs
 config :logger, :console,
-  format: "$time $metadata[$level] $message\n",
-  metadata: [:request_id],
-  # Add custom formatter to redact secrets
-  formatters: [Hudson.LogFormatter]
+  format: {Hudson.LogFormatter, :format},
+  metadata: [:request_id]
 
 # lib/hudson/log_formatter.ex
 defmodule Hudson.LogFormatter do
+  @moduledoc """
+  Custom log formatter that redacts sensitive information.
+  """
+
   def format(level, message, timestamp, metadata) do
-    message
+    # Default formatting
+    formatted_message = Logger.Formatter.format(
+      "$time $metadata[$level] $message\n",
+      level,
+      message,
+      timestamp,
+      metadata
+    )
+
+    # Redact secrets
+    formatted_message
+    |> to_string()
     |> redact(~r/DATABASE_URL=[^\s]+/, "DATABASE_URL=***")
-    |> redact(~r/sk-[a-zA-Z0-9]+/, "***")  # OpenAI keys
-    |> redact(~r/shpat_[a-f0-9]+/, "***")  # Shopify tokens
+    |> redact(~r/postgres:\/\/[^\s]+/, "postgres://***")
+    |> redact(~r/sk-[a-zA-Z0-9\-]+/, "sk-***")  # OpenAI keys
+    |> redact(~r/shpat_[a-f0-9]+/, "shpat_***")  # Shopify tokens
+  end
+
+  defp redact(string, pattern, replacement) do
+    String.replace(string, pattern, replacement)
   end
 end
 ```
