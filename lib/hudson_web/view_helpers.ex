@@ -11,6 +11,8 @@ defmodule HudsonWeb.ViewHelpers do
   ### Product Helpers
   - `add_primary_image/1` - Adds primary image to product struct
   - `public_image_url/1` - Returns public URL for image (currently Shopify URLs)
+  - `shopify_thumbnail_url/2` - Transforms Shopify URL to thumbnail size
+  - `session_top_products/2` - Gets top N products from session with images
 
   ### Price Formatting
   - `format_price/1` - Formats price in cents to dollar string ($X.XX)
@@ -64,6 +66,78 @@ defmodule HudsonWeb.ViewHelpers do
   def public_image_url(path) do
     # Path is already a full Shopify URL
     path
+  end
+
+  @doc """
+  Transforms a Shopify image URL to a thumbnail size.
+
+  Shopify CDN supports URL-based image transformations by inserting
+  size parameters before the file extension.
+
+  ## Size Options
+
+  - Atom: `:pico` (16x16), `:icon` (32x32), `:thumb` (50x50),
+    `:small` (100x100), `:compact` (160x160), `:medium` (240x240),
+    `:large` (480x480), `:grande` (600x600)
+  - String: Custom dimensions like "80x80" or "120x120"
+
+  ## Examples
+
+      iex> shopify_thumbnail_url("https://cdn.shopify.com/.../image.jpg", :small)
+      "https://cdn.shopify.com/.../image_small.jpg"
+
+      iex> shopify_thumbnail_url("https://cdn.shopify.com/.../image.jpg", "80x80")
+      "https://cdn.shopify.com/.../image_80x80.jpg"
+
+      iex> shopify_thumbnail_url(nil, :small)
+      nil
+  """
+  def shopify_thumbnail_url(nil, _size), do: nil
+
+  def shopify_thumbnail_url(url, size) when is_binary(url) do
+    # Extract file extension
+    case Path.extname(url) do
+      "" ->
+        url
+
+      ext ->
+        base = String.replace_suffix(url, ext, "")
+        size_suffix = if is_atom(size), do: "_#{size}", else: "_#{size}"
+        "#{base}#{size_suffix}#{ext}"
+    end
+  end
+
+  @doc """
+  Gets the top N products from a session with their primary images.
+
+  Returns a list of {product, primary_image} tuples, filtering out
+  any products that don't have images.
+
+  Defaults to showing up to 20 products for thumbnail previews.
+
+  ## Examples
+
+      iex> session_top_products(session)
+      [{%Product{}, %ProductImage{}}, {%Product{}, %ProductImage{}}]
+
+      iex> session_top_products(session, 10)
+      [{%Product{}, %ProductImage{}}, ...]
+  """
+  def session_top_products(session, count \\ 20) do
+    session.session_products
+    |> Enum.take(count)
+    |> Enum.map(fn sp ->
+      primary_image =
+        sp.product.product_images
+        |> Enum.find(& &1.is_primary)
+        |> case do
+          nil -> List.first(sp.product.product_images)
+          image -> image
+        end
+
+      {sp.product, primary_image}
+    end)
+    |> Enum.filter(fn {_product, image} -> image != nil end)
   end
 
   @doc """

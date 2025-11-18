@@ -50,6 +50,21 @@
               <%= if session.notes do %>
                 <p class="session-card__notes">{session.notes}</p>
               <% end %>
+
+              <%!-- Product thumbnails preview --%>
+              <%= if length(session.session_products) > 0 do %>
+                <div class="session-card__thumbnails">
+                  <%= for {product, image} <- session_top_products(session) do %>
+                    <img
+                      src={shopify_thumbnail_url(image.path, "80x80")}
+                      alt={image.alt_text || product.name}
+                      class="session-card__thumbnail"
+                      title={product.name}
+                      loading="lazy"
+                    />
+                  <% end %>
+                </div>
+              <% end %>
             </div>
 
             <div class="session-card__actions" phx-click="stop_propagation">
@@ -152,14 +167,13 @@
           ]}>
             <div class="session-card__details">
               <div class="session-card__details-header">
-                <h3 class="session-card__details-title">Products in this session:</h3>
                 <button
                   class="session-card__collapse-btn"
                   phx-click="toggle_expand"
                   phx-value-session-id={session.id}
                   aria-label="Collapse"
                 >
-                  ▲
+                  ▼
                 </button>
               </div>
 

@@ -118,6 +118,82 @@
   line-height: 1.5;
 }
 
+/* Thumbnails preview - horizontal scrollable film strip */
+.session-card__thumbnails {
+  display: flex;
+  gap: 6px;
+  margin-top: var(--space-3);
+  align-items: center;
+  overflow-x: auto;
+  padding: 4px 0 8px 0;
+  position: relative;
+
+  /* Smooth scrolling */
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch; /* iOS momentum scrolling */
+
+  /* Modern thin scrollbar */
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-secondary) transparent;
+
+  /* Transition for expand/collapse animation */
+  opacity: 1;
+  transform: translateY(0);
+  max-height: 200px; /* Enough for thumbnails + scrollbar */
+  transition: opacity 0.2s ease-out, transform 0.2s ease-out, max-height 0.2s ease-out, margin 0.2s ease-out;
+}
+
+/* Hide thumbnails when session is expanded - smooth slide down and collapse space */
+.session-card:has(.session-card__details-wrapper--expanded) .session-card__thumbnails {
+  opacity: 0;
+  transform: translateY(16px);
+  max-height: 0;
+  margin-top: 0;
+  margin-bottom: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  overflow: hidden;
+  pointer-events: none; /* Prevent interaction while hidden */
+}
+
+/* Webkit scrollbar styling (Chrome, Safari, Edge) */
+.session-card__thumbnails::-webkit-scrollbar {
+  height: 6px;
+}
+
+.session-card__thumbnails::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 3px;
+}
+
+.session-card__thumbnails::-webkit-scrollbar-thumb {
+  background-color: var(--color-border-secondary);
+  border-radius: 3px;
+  transition: background-color var(--transition-base);
+}
+
+.session-card__thumbnails::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-border-primary);
+}
+
+.session-card__thumbnail {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-md);
+  border: 2px solid var(--color-surface-primary);
+  object-fit: cover;
+  flex-shrink: 0; /* Prevent thumbnails from shrinking */
+  transition: all var(--transition-base);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  background-color: var(--color-bg-tertiary);
+}
+
+.session-card__thumbnail:hover {
+  transform: translateY(-4px) scale(1.05);
+  z-index: 10;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
 /* Actions - buttons on the right */
 .session-card__actions {
   display: flex;
@@ -135,11 +211,13 @@
   opacity: 0;
   transition: grid-template-rows 0.2s ease-out, opacity 0.15s ease-out 0.05s;
   overflow: hidden;
+  position: relative; /* For absolute positioning of collapse button */
 }
 
 .session-card__details-wrapper--expanded {
   grid-template-rows: 1fr;
   opacity: 1;
+  overflow: visible; /* Allow button to show above wrapper */
   transition: grid-template-rows 0.2s ease-out, opacity 0.15s ease-out;
 }
 
@@ -172,10 +250,29 @@
 }
 
 .session-card__details-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: var(--space-4);
+  position: absolute;
+  top: -16px; /* Position above the divider line */
+  right: 0;
+  z-index: 50; /* High z-index to appear above header content */
+  opacity: 0;
+  transform: translateY(4px);
+}
+
+/* Fade in collapse button with delay after products start appearing */
+.session-card__details-wrapper--expanded .session-card__details-header {
+  animation: fadeInButton 0.25s ease-out forwards;
+  animation-delay: 0.3s; /* Appear after first few products */
+}
+
+@keyframes fadeInButton {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .session-card__details-title {
@@ -201,6 +298,7 @@
   cursor: pointer;
   transition: all var(--transition-base);
   flex-shrink: 0;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .session-card__collapse-btn:hover {
@@ -248,16 +346,28 @@
 
 /* Animate products only when parent is expanded */
 .session-card__details-wrapper--expanded .session-card__product-item {
-  animation: fadeInUp 0.3s ease-out forwards;
+  animation: fadeInDown 0.3s ease-out forwards;
 }
 
-/* Stagger animation for product items */
-.session-card__details-wrapper--expanded .session-card__product-item:nth-child(1) { animation-delay: 0.05s; }
-.session-card__details-wrapper--expanded .session-card__product-item:nth-child(2) { animation-delay: 0.1s; }
-.session-card__details-wrapper--expanded .session-card__product-item:nth-child(3) { animation-delay: 0.15s; }
-.session-card__details-wrapper--expanded .session-card__product-item:nth-child(4) { animation-delay: 0.2s; }
-.session-card__details-wrapper--expanded .session-card__product-item:nth-child(5) { animation-delay: 0.25s; }
-.session-card__details-wrapper--expanded .session-card__product-item:nth-child(n+6) { animation-delay: 0.3s; }
+/* Stagger animation for product items - increased timing for smoother cascade */
+.session-card__details-wrapper--expanded .session-card__product-item:nth-child(1) { animation-delay: 0.08s; }
+.session-card__details-wrapper--expanded .session-card__product-item:nth-child(2) { animation-delay: 0.14s; }
+.session-card__details-wrapper--expanded .session-card__product-item:nth-child(3) { animation-delay: 0.2s; }
+.session-card__details-wrapper--expanded .session-card__product-item:nth-child(4) { animation-delay: 0.26s; }
+.session-card__details-wrapper--expanded .session-card__product-item:nth-child(5) { animation-delay: 0.32s; }
+.session-card__details-wrapper--expanded .session-card__product-item:nth-child(6) { animation-delay: 0.38s; }
+.session-card__details-wrapper--expanded .session-card__product-item:nth-child(n+7) { animation-delay: 0.44s; }
+
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 
 @keyframes fadeInUp {
   from {
@@ -336,8 +446,8 @@
 
 /* Animate add button when parent is expanded */
 .session-card__details-wrapper--expanded .session-card__add-product-btn {
-  animation: fadeInUp 0.3s ease-out forwards;
-  animation-delay: 0.35s;
+  animation: fadeInDown 0.3s ease-out forwards;
+  animation-delay: 0.5s;
 }
 
 /* Product actions - buttons on the right */
