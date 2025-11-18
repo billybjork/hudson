@@ -72,6 +72,7 @@
   justify-content: space-between;
   align-items: flex-start;
   gap: var(--space-6);
+  position: relative; /* For collapse button positioning */
 }
 
 /* Title group */
@@ -116,17 +117,24 @@
   color: var(--color-text-secondary);
   margin-top: var(--space-2);
   line-height: 1.5;
+  padding-right: var(--space-12); /* Space for collapse button */
+}
+
+/* Content switcher - container for thumbnails and products */
+.session-card__content-switcher {
+  position: relative;
+  margin-top: var(--space-4);
+  width: 100%;
+  /* No min-height - let content determine size */
 }
 
 /* Thumbnails preview - horizontal scrollable film strip */
 .session-card__thumbnails {
   display: flex;
   gap: 6px;
-  margin-top: var(--space-3);
   align-items: center;
   overflow-x: auto;
   padding: 4px 0 8px 0;
-  position: relative;
 
   /* Smooth scrolling */
   scroll-behavior: smooth;
@@ -136,24 +144,21 @@
   scrollbar-width: thin;
   scrollbar-color: var(--color-border-secondary) transparent;
 
-  /* Transition for expand/collapse animation */
+  /* Expand on close - start while products are fading for smooth handoff */
+  max-height: 200px;
   opacity: 1;
-  transform: translateY(0);
-  max-height: 200px; /* Enough for thumbnails + scrollbar */
-  transition: opacity 0.2s ease-out, transform 0.2s ease-out, max-height 0.2s ease-out, margin 0.2s ease-out;
+  transition: max-height 0.3s ease-out 0.12s, opacity 0.3s ease-out 0.12s, padding 0.3s ease-out 0.12s;
 }
 
-/* Hide thumbnails when session is expanded - smooth slide down and collapse space */
-.session-card:has(.session-card__details-wrapper--expanded) .session-card__thumbnails {
-  opacity: 0;
-  transform: translateY(16px);
+/* Collapse thumbnails when session is expanded */
+.session-card__content-switcher--expanded .session-card__thumbnails {
   max-height: 0;
-  margin-top: 0;
-  margin-bottom: 0;
+  opacity: 0;
   padding-top: 0;
   padding-bottom: 0;
   overflow: hidden;
-  pointer-events: none; /* Prevent interaction while hidden */
+  pointer-events: none;
+  transition: max-height 0.3s ease-out, opacity 0.25s ease-out, padding 0.3s ease-out;
 }
 
 /* Webkit scrollbar styling (Chrome, Safari, Edge) */
@@ -183,15 +188,78 @@
   border: 2px solid var(--color-surface-primary);
   object-fit: cover;
   flex-shrink: 0; /* Prevent thumbnails from shrinking */
-  transition: all var(--transition-base);
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   background-color: var(--color-bg-tertiary);
+
+  /* Default visible state */
+  opacity: 1;
+  transform: translateY(0) scale(1);
+
+  /* Smooth transition for reappearing when closing - match container timing */
+  transition: opacity 0.25s ease-out, transform 0.25s ease-out, box-shadow var(--transition-base);
+  transition-delay: 0.12s;
 }
 
 .session-card__thumbnail:hover {
   transform: translateY(-4px) scale(1.05);
   z-index: 10;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Hide thumbnails when expanded - slide DOWN and fade */
+.session-card__content-switcher--expanded .session-card__thumbnail {
+  opacity: 0;
+  transform: translateY(12px) scale(0.9);
+  transition: opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1), transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow var(--transition-base);
+}
+
+/* Staggered thumbnail exit - LEFT to RIGHT */
+.session-card__content-switcher--expanded .session-card__thumbnail:nth-child(1) { transition-delay: 0s; }
+.session-card__content-switcher--expanded .session-card__thumbnail:nth-child(2) { transition-delay: 0.05s; }
+.session-card__content-switcher--expanded .session-card__thumbnail:nth-child(3) { transition-delay: 0.10s; }
+.session-card__content-switcher--expanded .session-card__thumbnail:nth-child(4) { transition-delay: 0.15s; }
+.session-card__content-switcher--expanded .session-card__thumbnail:nth-child(5) { transition-delay: 0.20s; }
+.session-card__content-switcher--expanded .session-card__thumbnail:nth-child(6) { transition-delay: 0.25s; }
+.session-card__content-switcher--expanded .session-card__thumbnail:nth-child(n+7) { transition-delay: 0.30s; }
+
+/* Products wrapper - contains product list and collapse button */
+.session-card__products-wrapper {
+  display: grid;
+  grid-template-rows: 0fr;
+  overflow: hidden;
+  pointer-events: none;
+  /* Collapse grid while items fade, extend slightly for smooth handoff to thumbnails */
+  transition: grid-template-rows 0.3s ease-in;
+}
+
+.session-card__products-wrapper > * {
+  min-height: 0; /* Allow grid collapse */
+}
+
+/* Show products when expanded */
+.session-card__content-switcher--expanded .session-card__products-wrapper {
+  grid-template-rows: 1fr;
+  pointer-events: auto;
+  /* Start expanding early to overlap with thumbnail collapse - prevents height contraction */
+  transition: grid-template-rows 0.4s ease-out 0.1s;
+}
+
+/* Products inner wrapper */
+.session-card__products-inner {
+  position: relative;
+  width: 100%;
+}
+
+/* Collapse button wrapper - positioned in header at bottom right */
+.session-card__collapse-btn-wrapper {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  z-index: 10;
+  opacity: 0;
+  transform: translateY(4px);
+  animation: fadeInButton 0.25s ease-out forwards;
+  animation-delay: 0.45s;
 }
 
 /* Actions - buttons on the right */
@@ -204,66 +272,6 @@
   cursor: default; /* Override card's pointer cursor for button area */
 }
 
-/* Details wrapper - uses CSS Grid for smooth expand/collapse */
-.session-card__details-wrapper {
-  display: grid;
-  grid-template-rows: 0fr;
-  opacity: 0;
-  transition: grid-template-rows 0.2s ease-out, opacity 0.15s ease-out 0.05s;
-  overflow: hidden;
-  position: relative; /* For absolute positioning of collapse button */
-}
-
-.session-card__details-wrapper--expanded {
-  grid-template-rows: 1fr;
-  opacity: 1;
-  overflow: visible; /* Allow button to show above wrapper */
-  transition: grid-template-rows 0.2s ease-out, opacity 0.15s ease-out;
-}
-
-/* Expanded details section */
-.session-card__details {
-  min-height: 0;
-  margin-top: 0;
-  padding-top: 0;
-  border-top: 1px solid transparent;
-  transition: margin-top 0.2s ease-out, padding-top 0.2s ease-out, border-color 0.2s ease-out;
-}
-
-/* Add spacing and border when expanded */
-.session-card__details-wrapper--expanded .session-card__details {
-  margin-top: var(--space-6);
-  padding-top: var(--space-6);
-  border-top-color: var(--color-border-secondary);
-}
-
-/* Animation keyframes for staggered product appearance */
-@keyframes slideDown {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.session-card__details-header {
-  position: absolute;
-  top: -16px; /* Position above the divider line */
-  right: 0;
-  z-index: 50; /* High z-index to appear above header content */
-  opacity: 0;
-  transform: translateY(4px);
-}
-
-/* Fade in collapse button with delay after products start appearing */
-.session-card__details-wrapper--expanded .session-card__details-header {
-  animation: fadeInButton 0.25s ease-out forwards;
-  animation-delay: 0.3s; /* Appear after first few products */
-}
-
 @keyframes fadeInButton {
   from {
     opacity: 0;
@@ -273,13 +281,6 @@
     opacity: 1;
     transform: translateY(0);
   }
-}
-
-.session-card__details-title {
-  font-size: var(--text-lg);
-  font-weight: var(--font-semibold);
-  color: var(--color-text-primary);
-  margin: 0;
 }
 
 /* Collapse button */
@@ -314,8 +315,9 @@
 /* Product list - grid layout for cards */
 .session-card__product-list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
   gap: var(--space-4);
+  width: 100%;
 }
 
 /* Product item - horizontal card layout */
@@ -327,10 +329,16 @@
   background-color: var(--color-bg-secondary);
   border: 1px solid var(--color-border-secondary);
   border-radius: var(--radius-md);
-  transition: all var(--transition-base);
-  opacity: 0;
-  transform: translateY(8px);
   cursor: grab;
+  user-select: none;
+
+  /* Default hidden state */
+  opacity: 0;
+  transform: translateY(-12px);
+
+  /* Fast transition for closing - finish before thumbnails appear */
+  transition: opacity 0.15s ease-in, transform 0.15s ease-in, background-color var(--transition-base), border-color var(--transition-base);
+  transition-delay: 0s;
 }
 
 /* Product link - wraps clickable product content */
@@ -344,41 +352,22 @@
   color: inherit;
 }
 
-/* Animate products only when parent is expanded */
-.session-card__details-wrapper--expanded .session-card__product-item {
-  animation: fadeInDown 0.3s ease-out forwards;
+/* Show products when expanded - using transitions instead of animations */
+.session-card__content-switcher--expanded .session-card__product-item {
+  opacity: 1;
+  transform: translateY(0);
+  /* Slower transition for opening with smooth easing */
+  transition: opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1), transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), background-color var(--transition-base), border-color var(--transition-base);
 }
 
-/* Stagger animation for product items - increased timing for smoother cascade */
-.session-card__details-wrapper--expanded .session-card__product-item:nth-child(1) { animation-delay: 0.08s; }
-.session-card__details-wrapper--expanded .session-card__product-item:nth-child(2) { animation-delay: 0.14s; }
-.session-card__details-wrapper--expanded .session-card__product-item:nth-child(3) { animation-delay: 0.2s; }
-.session-card__details-wrapper--expanded .session-card__product-item:nth-child(4) { animation-delay: 0.26s; }
-.session-card__details-wrapper--expanded .session-card__product-item:nth-child(5) { animation-delay: 0.32s; }
-.session-card__details-wrapper--expanded .session-card__product-item:nth-child(6) { animation-delay: 0.38s; }
-.session-card__details-wrapper--expanded .session-card__product-item:nth-child(n+7) { animation-delay: 0.44s; }
-
-@keyframes fadeInDown {
-  from {
-    opacity: 0;
-    transform: translateY(-8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
+/* Stagger transition delays for product items - overlaps with thumbnail exit for smooth flow (left to right) */
+.session-card__content-switcher--expanded .session-card__product-item:nth-child(1) { transition-delay: 0.25s; }
+.session-card__content-switcher--expanded .session-card__product-item:nth-child(2) { transition-delay: 0.31s; }
+.session-card__content-switcher--expanded .session-card__product-item:nth-child(3) { transition-delay: 0.37s; }
+.session-card__content-switcher--expanded .session-card__product-item:nth-child(4) { transition-delay: 0.43s; }
+.session-card__content-switcher--expanded .session-card__product-item:nth-child(5) { transition-delay: 0.49s; }
+.session-card__content-switcher--expanded .session-card__product-item:nth-child(6) { transition-delay: 0.55s; }
+.session-card__content-switcher--expanded .session-card__product-item:nth-child(n+7) { transition-delay: 0.61s; }
 
 .session-card__product-item:hover {
   border-color: var(--color-border-primary);
@@ -417,6 +406,13 @@
   margin: 0;
   line-height: 1.4;
   min-width: 0; /* Allow text truncation */
+
+  /* Limit to 2 lines with ellipsis */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Add product button */
@@ -433,9 +429,12 @@
   font-weight: var(--font-light);
   color: var(--color-text-secondary);
   cursor: pointer;
-  transition: all var(--transition-base);
   opacity: 0;
-  transform: translateY(8px);
+  transform: translateY(-12px);
+
+  /* Fast transition for closing - match product items */
+  transition: opacity 0.15s ease-in, transform 0.15s ease-in, background-color var(--transition-base), border-color var(--transition-base);
+  transition-delay: 0s;
 }
 
 .session-card__add-product-btn:hover {
@@ -444,10 +443,12 @@
   color: var(--color-text-primary);
 }
 
-/* Animate add button when parent is expanded */
-.session-card__details-wrapper--expanded .session-card__add-product-btn {
-  animation: fadeInDown 0.3s ease-out forwards;
-  animation-delay: 0.5s;
+/* Show add button when parent is expanded - appears after product items */
+.session-card__content-switcher--expanded .session-card__add-product-btn {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1), transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), background-color var(--transition-base), border-color var(--transition-base);
+  transition-delay: 0.67s;
 }
 
 /* Product actions - buttons on the right */

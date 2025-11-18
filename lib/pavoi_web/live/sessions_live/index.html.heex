@@ -50,22 +50,21 @@
               <%= if session.notes do %>
                 <p class="session-card__notes">{session.notes}</p>
               <% end %>
-
-              <%!-- Product thumbnails preview --%>
-              <%= if length(session.session_products) > 0 do %>
-                <div class="session-card__thumbnails">
-                  <%= for {product, image} <- session_top_products(session) do %>
-                    <img
-                      src={shopify_thumbnail_url(image.path, "80x80")}
-                      alt={image.alt_text || product.name}
-                      class="session-card__thumbnail"
-                      title={product.name}
-                      loading="lazy"
-                    />
-                  <% end %>
-                </div>
-              <% end %>
             </div>
+
+            <%!-- Collapse button - shown when expanded --%>
+            <%= if @expanded_session_id == session.id do %>
+              <div class="session-card__collapse-btn-wrapper">
+                <button
+                  class="session-card__collapse-btn"
+                  phx-click="toggle_expand"
+                  phx-value-session-id={session.id}
+                  aria-label="Collapse"
+                >
+                  ▼
+                </button>
+              </div>
+            <% end %>
 
             <div class="session-card__actions" phx-click="stop_propagation">
               <a
@@ -160,94 +159,89 @@
             </div>
           </div>
 
-          <div class={[
-            "session-card__details-wrapper",
-            @expanded_session_id == session.id &&
-              "session-card__details-wrapper--expanded"
-          ]}>
-            <div class="session-card__details">
-              <div class="session-card__details-header">
-                <button
-                  class="session-card__collapse-btn"
-                  phx-click="toggle_expand"
-                  phx-value-session-id={session.id}
-                  aria-label="Collapse"
-                >
-                  ▼
-                </button>
+          <%!-- Content switcher: thumbnails and products --%>
+          <%= if length(session.session_products) > 0 do %>
+            <div class={[
+              "session-card__content-switcher",
+              @expanded_session_id == session.id && "session-card__content-switcher--expanded"
+            ]}>
+              <%!-- Product thumbnails preview (visible when collapsed) --%>
+              <div class="session-card__thumbnails">
+                <%= for {product, image} <- session_top_products(session) do %>
+                  <img
+                    src={shopify_thumbnail_url(image.path, "80x80")}
+                    alt={image.alt_text || product.name}
+                    class="session-card__thumbnail"
+                    title={product.name}
+                    loading="lazy"
+                  />
+                <% end %>
               </div>
 
-              <%= if session.session_products == [] do %>
-                <p class="text-secondary text-sm">No products added yet.</p>
-                <.button
-                  size="sm"
-                  variant="ghost"
-                  phx-click="load_products_for_session"
-                  phx-value-session-id={session.id}
-                  class="session-card__add-product-btn"
-                >
-                  +
-                </.button>
-              <% else %>
-                <div
-                  id={"session-#{session.id}-products"}
-                  phx-hook="ProductSortable"
-                  data-session-id={session.id}
-                  class="session-card__product-list"
-                >
-                  <%= for sp <- session.session_products do %>
-                    <div
-                      id={"session-product-#{sp.id}"}
-                      class="session-card__product-item"
-                      data-id={sp.id}
-                      data-product-id={sp.product_id}
-                    >
-                      <div class="session-card__product-link">
-                        <div class="session-card__product-position">
-                          {sp.position}
+              <%!-- Product details (visible when expanded) --%>
+              <div class="session-card__products-wrapper">
+                <div class="session-card__products-inner">
+                  <%!-- Product list --%>
+                  <div
+                    id={"session-#{session.id}-products"}
+                    phx-hook="ProductSortable"
+                    data-session-id={session.id}
+                    class="session-card__product-list"
+                  >
+                    <%= for sp <- session.session_products do %>
+                      <div
+                        id={"session-product-#{sp.id}"}
+                        class="session-card__product-item"
+                        data-id={sp.id}
+                        data-product-id={sp.product_id}
+                      >
+                        <div class="session-card__product-link">
+                          <div class="session-card__product-position">
+                            {sp.position}
+                          </div>
+
+                          <%= if image = primary_image(sp.product) do %>
+                            <img
+                              src={public_image_url(image.thumbnail_path || image.path)}
+                              alt={image.alt_text}
+                              class="session-card__product-image"
+                            />
+                          <% end %>
+
+                          <p class="session-card__product-name">
+                            {sp.featured_name || sp.product.name}
+                          </p>
                         </div>
 
-                        <%= if image = primary_image(sp.product) do %>
-                          <img
-                            src={public_image_url(image.thumbnail_path || image.path)}
-                            alt={image.alt_text}
-                            class="session-card__product-image"
-                          />
-                        <% end %>
-
-                        <p class="session-card__product-name">
-                          {sp.featured_name || sp.product.name}
-                        </p>
+                        <div class="session-card__product-actions">
+                          <.button
+                            size="xs"
+                            variant="ghost"
+                            circle
+                            phx-click="remove_product"
+                            phx-value-session-product-id={sp.id}
+                            aria-label="Remove product"
+                            class="text-error"
+                          >
+                            ×
+                          </.button>
+                        </div>
                       </div>
-
-                      <div class="session-card__product-actions">
-                        <.button
-                          size="xs"
-                          variant="ghost"
-                          circle
-                          phx-click="remove_product"
-                          phx-value-session-product-id={sp.id}
-                          aria-label="Remove product"
-                          class="text-error"
-                        >
-                          ×
-                        </.button>
-                      </div>
-                    </div>
-                  <% end %>
-                  <.button
-                    size="sm"
-                    variant="ghost"
-                    phx-click="load_products_for_session"
-                    phx-value-session-id={session.id}
-                    class="session-card__add-product-btn"
-                  >
-                    +
-                  </.button>
+                    <% end %>
+                    <.button
+                      size="sm"
+                      variant="ghost"
+                      phx-click="load_products_for_session"
+                      phx-value-session-id={session.id}
+                      class="session-card__add-product-btn"
+                    >
+                      +
+                    </.button>
+                  </div>
                 </div>
-              <% end %>
+              </div>
             </div>
-          </div>
+          <% end %>
         </article>
       <% end %>
     <% end %>
