@@ -200,16 +200,9 @@
                       id={"session-product-#{sp.id}"}
                       class="session-card__product-item"
                       data-id={sp.id}
+                      data-product-id={sp.product_id}
                     >
-                      <div class="drag-handle session-card__drag-handle" title="Drag to reorder">
-                        ⋮⋮
-                      </div>
-
-                      <div
-                        class="session-card__product-link"
-                        phx-click="show_edit_product_modal"
-                        phx-value-product-id={sp.product_id}
-                      >
+                      <div class="session-card__product-link">
                         <div class="session-card__product-position">
                           {sp.position}
                         </div>

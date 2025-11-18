@@ -330,6 +330,7 @@
   transition: all var(--transition-base);
   opacity: 0;
   transform: translateY(8px);
+  cursor: grab;
 }
 
 /* Product link - wraps clickable product content */
@@ -341,7 +342,6 @@
   min-width: 0; /* Allow text truncation */
   text-decoration: none;
   color: inherit;
-  cursor: pointer;
 }
 
 /* Animate products only when parent is expanded */
@@ -600,33 +600,6 @@
    Styles for drag-and-drop product reordering
    ============================================================================ */
 
-/* Drag handle - visual indicator for dragging */
-.session-card__drag-handle {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  color: var(--color-text-tertiary);
-  font-size: var(--text-base);
-  line-height: 1;
-  cursor: grab;
-  user-select: none;
-  flex-shrink: 0;
-  transition: all var(--transition-base);
-  border-radius: var(--radius-sm);
-}
-
-.session-card__drag-handle:hover {
-  color: var(--color-text-secondary);
-  background-color: var(--color-bg-hover);
-}
-
-.session-card__drag-handle:active {
-  cursor: grabbing;
-}
-
 /* Sortable states - applied by SortableJS during drag operations */
 
 /* Ghost: placeholder where item will be dropped */
@@ -653,12 +626,7 @@
 /* Chosen: item when selected for drag */
 .sortable-chosen {
   cursor: grabbing;
-}
-
-.sortable-chosen .session-card__drag-handle {
-  cursor: grabbing;
-  color: var(--color-text-primary);
-  background-color: var(--color-bg-hover);
+  user-select: none;
 }
 
 /* Prevent text selection during drag */
