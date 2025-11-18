@@ -15,6 +15,12 @@ defmodule HudsonWeb.Router do
   end
 
   scope "/", HudsonWeb do
+    pipe_through :api
+
+    get "/healthz", HealthController, :check
+  end
+
+  scope "/", HudsonWeb do
     pipe_through :browser
 
     # Redirect root to sessions manager
