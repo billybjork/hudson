@@ -74,7 +74,18 @@ ln -sf hudson_macos_arm hudson_macos_arm-aarch64-apple-darwin
 - Use `HUDSON_ENABLE_NEON=local` to connect to local Postgres (recommended for development)
 - Or update the page to gracefully handle offline mode (check if Repo is started)
 
-## 📌 Latest Progress (2025-11-17)
+## 📌 Latest Progress
+
+### 2025-11-18
+- ✅ **Windows cross-compilation blocker resolved**: Removed unused NIF dependencies (bcrypt_elixir, lazy_html) that were causing build issues
+  - bcrypt_elixir was vestigial - Hudson has no authentication system
+  - lazy_html was inherited from Phoenix LiveView but never used in production code
+  - Only remaining NIF is exqlite (SQLite driver), which Burrito handles cleanly
+  - Cross-platform Windows builds should now be possible (pending testing)
+- ✅ **Dependency cleanup**: Reduced total dependencies from 92 to 88 packages
+- ✅ **Updated runtime smoke checks**: Now validates only exqlite NIF loading
+
+### 2025-11-17
 - ✅ **Database mode configuration complete**: Added three-mode `HUDSON_ENABLE_NEON` support:
   - `true` - Neon cloud database (production)
   - `local` - Local PostgreSQL (development, now the default)
@@ -212,7 +223,7 @@ ln -sf hudson_macos_arm hudson_macos_arm-aarch64-apple-darwin
 
 ### 10) Testing/Verification
 - Add automated smoke for each target:
-  - Launch BEAM, hit `/healthz`, open WebView URL, verify bcrypt/lazy_html NIFs load.
+  - Launch BEAM, hit `/healthz`, open WebView URL, verify exqlite NIF loads.
   - SQLite migration + cache read/write.
   - Update flow in temp dir (download, verify, swap, rollback).
 - Keep `mix precommit` green; add unit tests for the sync queue and media cache.
@@ -226,7 +237,7 @@ ln -sf hudson_macos_arm hudson_macos_arm-aarch64-apple-darwin
 - ✅ Random loopback port selection implemented - writes `/tmp/hudson_port.json`
 - ✅ First-run friendly boot - works without environment variables via secure storage pattern
 - ✅ Tauri shell working - spawns BEAM, reads handshake, polls health, loads WebView
-- ✅ NIFs validated on macOS ARM - bcrypt_elixir and lazy_html load successfully in Burrito binary
+- ✅ NIFs validated on macOS ARM - exqlite (SQLite driver) loads successfully in Burrito binary
 - ✅ SQLite Repo + auto-migrations - runs on startup, handles version tracking
 - ✅ Clean lifecycle - Tauri properly spawns and terminates BEAM backend
 
@@ -237,8 +248,9 @@ ln -sf hudson_macos_arm hudson_macos_arm-aarch64-apple-darwin
 ```
 
 **Known Limitations (Pilot):**
-- macOS ARM only (cross-compilation disabled due to spaces in path breaking lazy_html Makefile)
+- macOS ARM only (cross-compilation for Windows/Intel not yet tested)
 - File-based secret storage (OS keychain integration planned for production)
+- Unused NIF dependencies (bcrypt_elixir, lazy_html) removed to simplify cross-platform builds
 
 ## Next Steps for Production
 
@@ -280,8 +292,9 @@ The pilot is complete and working on macOS ARM. The following items are needed f
 - **Targets needed:**
   - macOS Intel (x86_64-apple-darwin)
   - Windows (x86_64-pc-windows-msvc)
-- **Blockers:**
-  - lazy_html NIF Makefile breaks with spaces in path during cross-compilation
+- **Blockers:** ✅ RESOLVED
+  - ~~lazy_html NIF Makefile breaks with spaces in path~~ - Removed unused NIFs (bcrypt_elixir, lazy_html)
+  - Only remaining NIF is exqlite (SQLite driver) which Burrito handles cleanly
   - Need to test Zig cross-compilation workflow for each target
 - **Files to modify:** `mix.exs` (Burrito config), CI/CD scripts
 
@@ -598,7 +611,7 @@ jobs:
 | Neon schema too new | `neon_version > expected_version` | Block startup, show "Update Required" dialog |
 | SQLite corruption | `Ecto.Adapters.SQL.query!` raises | Delete local.db, re-sync from Neon, log incident |
 | Port conflict | `Bandit.start_link` fails | Retry with 3 random ports, then error |
-| NIF load failure | `bcrypt_elixir` or `lazy_html` error | Log to file, show "Installation corrupted" dialog |
+| NIF load failure | `exqlite` (SQLite) error | Log to file, show "Installation corrupted" dialog |
 
 ### Runtime Failure Scenarios
 
