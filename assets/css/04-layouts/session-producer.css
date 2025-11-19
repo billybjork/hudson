@@ -504,13 +504,113 @@
 
 /* Mobile adjustments */
 @media (max-width: 768px) {
+  /* Keep header on one line - make it compact */
   .producer-control-bar {
-    flex-direction: column;
-    align-items: stretch;
+    padding: var(--space-2) var(--space-3);
+    gap: var(--space-2);
+  }
+
+  .producer-left-section {
+    gap: var(--space-2);
+    min-width: 0;
+    flex: 1;
+  }
+
+  .back-to-sessions {
+    padding: var(--space-1) var(--space-2);
+    font-size: var(--text-xs);
+    flex-shrink: 0;
+  }
+
+  .session-title {
+    font-size: var(--text-xs);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .view-mode-controls {
-    justify-content: center;
+    flex-shrink: 0;
+    padding: var(--space-05);
+    gap: var(--space-1);
+  }
+
+  .view-mode-btn {
+    padding: var(--space-1) var(--space-2);
+    font-size: var(--text-xs);
+  }
+
+  /* Adjust split screen for mobile - give more space to products */
+  .producer-split-screen {
+    padding: var(--space-2);
+    gap: var(--space-2);
+  }
+
+  .config-panel {
+    max-height: 50vh;
+  }
+
+  /* Reduce message section size */
+  .config-panel__top {
+    padding: var(--space-3);
+    gap: var(--space-3);
+  }
+
+  .message-controls h3 {
+    font-size: var(--text-sm);
+  }
+
+  .message-input {
+    min-height: 60px;
+    padding: var(--space-2) var(--space-3);
+    font-size: var(--text-sm);
+  }
+
+  .message-buttons .btn-sm {
+    font-size: var(--text-xs);
+    padding: var(--space-1) var(--space-3);
+  }
+
+  /* Give products section more space */
+  .config-panel__middle {
+    padding: 0 var(--space-3);
+    flex: 1;
+    min-height: 150px;
+  }
+
+  .config-panel__middle h3 {
+    font-size: var(--text-sm);
+    padding-top: 0;
+  }
+
+  /* Compact shortcuts */
+  .config-panel__bottom {
+    padding: var(--space-2) var(--space-3);
+  }
+
+  .shortcuts-reference h3 {
+    font-size: var(--text-xs);
+    margin-bottom: var(--space-1);
+  }
+
+  .shortcuts-reference ul {
+    gap: var(--space-05);
+  }
+
+  .shortcuts-reference li {
+    font-size: 10px;
+  }
+
+  /* Smaller product items */
+  .producer-product-item {
+    padding: var(--space-2);
+    gap: var(--space-2);
+  }
+
+  .producer-product-position {
+    width: 28px;
+    height: 28px;
+    font-size: var(--text-xs);
   }
 
   .producer-product-image {
@@ -519,6 +619,16 @@
   }
 
   .producer-product-name {
+    font-size: var(--text-xs);
+  }
+
+  /* Host preview gets remaining space */
+  .host-preview {
+    max-height: 50vh;
+  }
+
+  .host-preview-label {
+    padding: var(--space-1) var(--space-2);
     font-size: var(--text-xs);
   }
 }

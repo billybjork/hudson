@@ -290,6 +290,83 @@ defmodule PavoiWeb.CoreComponents do
   end
 
   @doc """
+  Renders a search input with an optional clear button.
+
+  The clear button appears on the right side of the input when text is entered.
+
+  ## Attributes
+  - `name` - The input name (default: "value")
+  - `value` - The current search value
+  - `placeholder` - Placeholder text (default: "Search...")
+  - `on_change` - Event name to trigger on input change (required)
+  - `on_submit` - Event name to trigger on form submit (default: same as on_change)
+  - `on_clear` - Event name to trigger when clear button is clicked (default: same as on_change)
+  - `debounce` - Debounce delay in milliseconds (default: 300)
+  - `class` - Additional CSS classes for the input
+
+  ## Examples
+
+      <.search_input
+        value={@search_query}
+        on_change="search"
+        placeholder="Search products..."
+      />
+  """
+  attr :name, :string, default: "value"
+  attr :value, :string, required: true
+  attr :placeholder, :string, default: "Search..."
+  attr :on_change, :string, required: true
+  attr :on_submit, :string, default: nil
+  attr :on_clear, :string, default: nil
+  attr :debounce, :integer, default: 300
+  attr :class, :string, default: nil
+
+  def search_input(assigns) do
+    # Set defaults for optional events - use on_change if not explicitly set
+    # Use a stable ID based on the event name, not the full assigns
+    assigns =
+      assigns
+      |> assign(:on_submit, assigns[:on_submit] || assigns.on_change)
+      |> assign(:on_clear, assigns[:on_clear] || assigns.on_change)
+      |> assign_new(:input_id, fn -> "search-input-#{assigns.on_change}" end)
+
+    ~H"""
+    <div class="search-input">
+      <form phx-change={@on_change} phx-submit={@on_submit} phx-debounce={@debounce}>
+        <input
+          id={@input_id}
+          type="text"
+          name={@name}
+          placeholder={@placeholder}
+          value={@value}
+          class={["input input--sm search-input__field", @class]}
+        />
+        <%= if @value != "" do %>
+          <button
+            type="button"
+            class="search-input__clear"
+            phx-click={
+              if @on_clear do
+                JS.push(@on_clear, value: %{@name => ""})
+                |> JS.set_attribute({"value", ""}, to: "##{@input_id}")
+              else
+                JS.set_attribute({"value", ""}, to: "##{@input_id}")
+                |> JS.dispatch("input", to: "##{@input_id}")
+              end
+            }
+            aria-label="Clear search"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" style="width: 16px; height: 16px;">
+              <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+            </svg>
+          </button>
+        <% end %>
+      </form>
+    </div>
+    """
+  end
+
+  @doc """
   Renders a header with title.
   """
   slot :inner_block, required: true

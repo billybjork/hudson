@@ -399,6 +399,7 @@ defmodule PavoiWeb.ProductComponents do
   attr :products, :any, required: true, doc: "List of products to display"
   attr :mode, :atom, default: :browse, values: [:browse, :select], doc: "Grid mode"
   attr :search_query, :string, default: "", doc: "Current search query"
+  attr :search_touched, :boolean, default: false, doc: "Whether search has been used (disables animations)"
   attr :has_more, :boolean, default: false, doc: "Whether more products are available"
   attr :on_product_click, :string, required: true, doc: "Event to trigger on product click"
   attr :on_search, :string, default: nil, doc: "Event to trigger on search"
@@ -432,20 +433,20 @@ defmodule PavoiWeb.ProductComponents do
 
   def product_grid(assigns) do
     ~H"""
-    <div class={["product-grid", "product-grid--#{@mode}"]}>
+    <div class={[
+      "product-grid",
+      "product-grid--#{@mode}",
+      @search_touched && "product-grid--searching"
+    ]}>
       <%= if @show_search do %>
         <div class="product-grid__header">
           <div class="product-grid__controls">
             <div class="product-grid__search">
-              <form phx-change={@on_search} phx-submit={@on_search} phx-debounce="300">
-                <input
-                  type="text"
-                  name="value"
-                  placeholder={@search_placeholder}
-                  value={@search_query}
-                  class="input input--sm"
-                />
-              </form>
+              <.search_input
+                value={@search_query}
+                on_change={@on_search}
+                placeholder={@search_placeholder}
+              />
             </div>
             <%= if @show_sort do %>
               <div class="product-grid__sort">
@@ -528,6 +529,7 @@ defmodule PavoiWeb.ProductComponents do
                 product={product}
                 on_click={@on_product_click}
                 show_prices={@show_prices}
+                index={product.stream_index}
               />
             <% else %>
               <.live_component
@@ -693,10 +695,21 @@ defmodule PavoiWeb.ProductComponents do
 
     @impl true
     def render(assigns) do
+      # Calculate staggered animation delay: first item at 0.15s (longer to ensure styles apply), increment 0.08s per item
+      animation_delay =
+        if Map.has_key?(assigns, :index) do
+          "#{assigns.index * 0.08 + 0.15}s"
+        else
+          "0.15s"
+        end
+
+      assigns = assign(assigns, :animation_delay, animation_delay)
+
       ~H"""
       <div
         id={"browse-card-#{@product.id}"}
         class="product-card-browse"
+        style={"animation-delay: #{@animation_delay};"}
         phx-click={@on_click}
         phx-value-product-id={@product.id}
         role="button"

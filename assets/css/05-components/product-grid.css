@@ -195,8 +195,15 @@
   border: 1px solid var(--color-border-secondary);
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  /* Only transition properties not being animated */
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
   overflow: hidden;
+
+  /* Start hidden - animation will reveal */
+  opacity: 0;
+
+  /* Fade in + slide up animation - delay applied inline per component */
+  animation: fadeInSlideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 .product-card-browse:hover {
@@ -284,6 +291,13 @@
   justify-content: center;
 }
 
+/* Disable animation when searching for instant results */
+.product-grid--searching .product-card-browse {
+  animation: none;
+  opacity: 1;
+  transform: translateY(0);
+}
+
 /* Custom infinite scroll trigger element */
 infinite-scroll-trigger {
   grid-column: 1 / -1;
@@ -299,6 +313,21 @@ infinite-scroll-trigger {
   gap: var(--space-2);
   color: var(--color-text-secondary);
   font-size: var(--text-sm);
+}
+
+/* ============================================================================
+   ANIMATIONS
+   ============================================================================ */
+
+@keyframes fadeInSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* Mobile responsive - maximize space efficiency */

@@ -38,6 +38,7 @@ defmodule PavoiWeb.ProductsLive.Index do
       |> assign(:product_total_count, 0)
       |> assign(:products_has_more, false)
       |> assign(:loading_products, false)
+      |> assign(:search_touched, false)
       |> stream(:products, [])
       |> assign(:generating_product_id, nil)
 
@@ -248,6 +249,9 @@ defmodule PavoiWeb.ProductsLive.Index do
 
   @impl true
   def handle_event("search_products", %{"value" => query}, socket) do
+    # Mark search as touched to disable animations on subsequent loads
+    socket = assign(socket, :search_touched, true)
+
     # Use push_patch to update URL - handle_params will handle the actual search
     # Preserve the current sort option
     query_params =
@@ -374,10 +378,19 @@ defmodule PavoiWeb.ProductsLive.Index do
           per_page: 20
         )
 
+      # Add stream_index to each product for staggered animations
+      # Always start from 0 for each batch so infinite scroll doesn't have huge delays
+      products_with_index =
+        result.products
+        |> Enum.with_index(0)
+        |> Enum.map(fn {product, index} ->
+          Map.put(product, :stream_index, index)
+        end)
+
       # Products already have primary_image field from Catalog context
       socket
       |> assign(:loading_products, false)
-      |> stream(:products, result.products,
+      |> stream(:products, products_with_index,
         reset: !append,
         at: if(append, do: -1, else: 0)
       )

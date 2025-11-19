@@ -14,15 +14,11 @@
   <%!-- Search Bar --%>
   <div class="sessions-header">
     <div class="sessions-search">
-      <form phx-change="search_sessions" phx-submit="search_sessions" phx-debounce="300">
-        <input
-          type="text"
-          name="value"
-          placeholder="Search by name or notes..."
-          value={@session_search_query}
-          class="input input--sm"
-        />
-      </form>
+      <.search_input
+        value={@session_search_query}
+        on_change="search_sessions"
+        placeholder="Search by name or notes..."
+      />
     </div>
   </div>
 
