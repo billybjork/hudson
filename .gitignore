@@ -29,6 +29,9 @@ Temporary Items
 *.swo
 *~
 
+# Node / NPM
+/assets/node_modules/
+
 # Elixir / Phoenix (for future)
 /_build/
 /deps/
