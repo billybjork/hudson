@@ -327,6 +327,12 @@ defmodule PavoiWeb.CoreComponents do
   def nav_tabs(assigns) do
     ~H"""
     <nav id="global-nav" class="navbar" phx-hook="GlobalNavigation">
+      <div class="navbar__start">
+        <.link href={~p"/sessions"} class="navbar__brand">
+          <img src={~p"/images/logo-light.svg"} class="navbar__logo navbar__logo--light" alt="Pavoi" />
+          <img src={~p"/images/logo-dark.svg"} class="navbar__logo navbar__logo--dark" alt="Pavoi" />
+        </.link>
+      </div>
       <div class="navbar__nav">
         <.link
           href={~p"/sessions"}
@@ -343,7 +349,7 @@ defmodule PavoiWeb.CoreComponents do
       </div>
       <div class="navbar__end">
         <.button
-          :if={@current_page == :sessions}
+          class={if @current_page != :sessions, do: "invisible"}
           variant="primary"
           size="sm"
           phx-click="show_new_session_modal"

@@ -43,6 +43,22 @@
   width: auto;
 }
 
+.navbar__logo--light {
+  display: block;
+}
+
+.navbar__logo--dark {
+  display: none;
+}
+
+.dark .navbar__logo--light {
+  display: none;
+}
+
+.dark .navbar__logo--dark {
+  display: block;
+}
+
 .navbar__nav {
   display: flex;
   align-items: center;
