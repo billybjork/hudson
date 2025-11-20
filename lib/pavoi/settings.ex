@@ -42,6 +42,41 @@ defmodule Pavoi.Settings do
     end
   end
 
+  @doc """
+  Gets the last TikTok Shop sync timestamp.
+
+  Returns nil if never synced or a DateTime if synced before.
+  """
+  def get_tiktok_last_sync_at do
+    case Repo.get_by(SystemSetting, key: "tiktok_last_sync_at") do
+      nil -> nil
+      setting -> parse_datetime(setting.value)
+    end
+  end
+
+  @doc """
+  Updates the last TikTok Shop sync timestamp to the current time.
+  """
+  def update_tiktok_last_sync_at do
+    now = DateTime.utc_now() |> DateTime.to_iso8601()
+
+    case Repo.get_by(SystemSetting, key: "tiktok_last_sync_at") do
+      nil ->
+        %SystemSetting{}
+        |> SystemSetting.changeset(%{
+          key: "tiktok_last_sync_at",
+          value: now,
+          value_type: "datetime"
+        })
+        |> Repo.insert()
+
+      setting ->
+        setting
+        |> SystemSetting.changeset(%{value: now})
+        |> Repo.update()
+    end
+  end
+
   defp parse_datetime(nil), do: nil
 
   defp parse_datetime(value) when is_binary(value) do

@@ -39,10 +39,12 @@ config :pavoi, Oban,
     {Oban.Plugins.Cron,
      crontab: [
        # Sync products every hour
-       {"0 * * * *", Pavoi.Workers.ShopifySyncWorker}
+       {"0 * * * *", Pavoi.Workers.ShopifySyncWorker},
+       # Sync TikTok Shop products every hour
+       {"0 * * * *", Pavoi.Workers.TiktokSyncWorker}
      ]}
   ],
-  queues: [default: 10, shopify: 5]
+  queues: [default: 10, shopify: 5, tiktok: 5]
 
 # Configure esbuild (the version is required)
 config :esbuild,

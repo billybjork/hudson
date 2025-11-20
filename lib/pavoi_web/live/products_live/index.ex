@@ -8,26 +8,32 @@ defmodule PavoiWeb.ProductsLive.Index do
   alias Pavoi.Catalog.Product
   alias Pavoi.Settings
   alias Pavoi.Workers.ShopifySyncWorker
+  alias Pavoi.Workers.TiktokSyncWorker
 
   import PavoiWeb.ProductComponents
   import PavoiWeb.ViewHelpers
 
   @impl true
   def mount(_params, _session, socket) do
-    # Subscribe to Shopify sync events and AI generation events
+    # Subscribe to Shopify sync events, TikTok sync events, and AI generation events
     if connected?(socket) do
       Phoenix.PubSub.subscribe(Pavoi.PubSub, "shopify:sync")
+      Phoenix.PubSub.subscribe(Pavoi.PubSub, "tiktok:sync")
       Phoenix.PubSub.subscribe(Pavoi.PubSub, "ai:talking_points")
     end
 
     brands = Catalog.list_brands()
     last_sync_at = Settings.get_shopify_last_sync_at()
+    tiktok_last_sync_at = Settings.get_tiktok_last_sync_at()
 
     socket =
       socket
       |> assign(:brands, brands)
       |> assign(:last_sync_at, last_sync_at)
       |> assign(:syncing, false)
+      |> assign(:tiktok_last_sync_at, tiktok_last_sync_at)
+      |> assign(:tiktok_syncing, false)
+      |> assign(:platform_filter, "")
       |> assign(:editing_product, nil)
       |> assign(:product_edit_form, to_form(Product.changeset(%Product{}, %{})))
       |> assign(:current_edit_image_index, 0)
@@ -94,6 +100,46 @@ defmodule PavoiWeb.ProductsLive.Index do
     socket =
       socket
       |> assign(:syncing, false)
+      |> put_flash(:error, message)
+
+    {:noreply, socket}
+  end
+
+  # TikTok sync event handlers
+  @impl true
+  def handle_info({:tiktok_sync_started}, socket) do
+    socket =
+      socket
+      |> assign(:tiktok_syncing, true)
+      |> put_flash(:info, "Syncing product catalog from TikTok Shop...")
+
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_info({:tiktok_sync_completed, _counts}, socket) do
+    # Reload products and update last sync timestamp
+    tiktok_last_sync_at = Settings.get_tiktok_last_sync_at()
+
+    socket =
+      socket
+      |> assign(:tiktok_syncing, false)
+      |> assign(:tiktok_last_sync_at, tiktok_last_sync_at)
+      |> assign(:product_page, 1)
+      |> assign(:loading_products, true)
+      |> load_products_for_browse()
+      |> put_flash(:info, "TikTok sync completed successfully")
+
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_info({:tiktok_sync_failed, reason}, socket) do
+    message = "TikTok sync failed: #{inspect(reason)}"
+
+    socket =
+      socket
+      |> assign(:tiktok_syncing, false)
       |> put_flash(:error, message)
 
     {:noreply, socket}
@@ -177,27 +223,52 @@ defmodule PavoiWeb.ProductsLive.Index do
   end
 
   @impl true
-  def handle_event("show_edit_product_modal", %{"product-id" => product_id}, socket) do
-    # Update URL to include product ID, preserving search query if present
+  def handle_event("trigger_tiktok_sync", _params, socket) do
+    # Enqueue a TikTok sync job
+    %{}
+    |> TiktokSyncWorker.new()
+    |> Oban.insert()
+
+    socket =
+      socket
+      |> assign(:tiktok_syncing, true)
+      |> put_flash(:info, "TikTok sync initiated...")
+
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_event("platform_filter_changed", %{"platform" => platform}, socket) do
+    # Build query params preserving search query, sort, and adding platform filter
     query_params =
-      if socket.assigns.product_search_query != "" do
-        %{p: product_id, q: socket.assigns.product_search_query}
-      else
-        %{p: product_id}
-      end
+      %{}
+      |> maybe_add_param(:q, socket.assigns.product_search_query)
+      |> maybe_add_param(:sort, socket.assigns.product_sort_by)
+      |> maybe_add_param(:platform, platform)
+
+    {:noreply, push_patch(socket, to: ~p"/products?#{query_params}")}
+  end
+
+  @impl true
+  def handle_event("show_edit_product_modal", %{"product-id" => product_id}, socket) do
+    # Update URL to include product ID, preserving all other query params
+    query_params =
+      %{p: product_id}
+      |> maybe_add_param(:q, socket.assigns.product_search_query)
+      |> maybe_add_param(:sort, socket.assigns.product_sort_by)
+      |> maybe_add_param(:platform, socket.assigns.platform_filter)
 
     {:noreply, push_patch(socket, to: ~p"/products?#{query_params}")}
   end
 
   @impl true
   def handle_event("close_edit_product_modal", _params, socket) do
-    # Preserve search query when closing modal
+    # Preserve all query params when closing modal
     query_params =
-      if socket.assigns.product_search_query != "" do
-        %{q: socket.assigns.product_search_query}
-      else
-        %{}
-      end
+      %{}
+      |> maybe_add_param(:q, socket.assigns.product_search_query)
+      |> maybe_add_param(:sort, socket.assigns.product_sort_by)
+      |> maybe_add_param(:platform, socket.assigns.platform_filter)
 
     socket =
       socket
@@ -253,37 +324,24 @@ defmodule PavoiWeb.ProductsLive.Index do
     socket = assign(socket, :search_touched, true)
 
     # Use push_patch to update URL - handle_params will handle the actual search
-    # Preserve the current sort option
+    # Preserve the current sort option and platform filter
     query_params =
-      case {query, socket.assigns.product_sort_by} do
-        {"", ""} -> %{}
-        {"", sort_by} -> %{sort: sort_by}
-        {q, ""} -> %{q: q}
-        {q, sort_by} -> %{q: q, sort: sort_by}
-      end
+      %{}
+      |> maybe_add_param(:q, query)
+      |> maybe_add_param(:sort, socket.assigns.product_sort_by)
+      |> maybe_add_param(:platform, socket.assigns.platform_filter)
 
     {:noreply, push_patch(socket, to: ~p"/products?#{query_params}")}
   end
 
   @impl true
   def handle_event("sort_changed", %{"sort" => sort_by}, socket) do
-    # Build query params preserving search query and adding sort
+    # Build query params preserving search query, sort, and platform filter
     query_params =
-      case socket.assigns.product_search_query do
-        "" ->
-          if sort_by == "" do
-            %{}
-          else
-            %{sort: sort_by}
-          end
-
-        search_query ->
-          if sort_by == "" do
-            %{q: search_query}
-          else
-            %{q: search_query, sort: sort_by}
-          end
-      end
+      %{}
+      |> maybe_add_param(:q, socket.assigns.product_search_query)
+      |> maybe_add_param(:sort, sort_by)
+      |> maybe_add_param(:platform, socket.assigns.platform_filter)
 
     {:noreply, push_patch(socket, to: ~p"/products?#{query_params}")}
   end
@@ -367,6 +425,7 @@ defmodule PavoiWeb.ProductsLive.Index do
     append = Keyword.get(opts, :append, false)
     search_query = socket.assigns.product_search_query
     sort_by = socket.assigns.product_sort_by
+    platform_filter = socket.assigns.platform_filter
     page = if append, do: socket.assigns.product_page + 1, else: 1
 
     try do
@@ -374,6 +433,7 @@ defmodule PavoiWeb.ProductsLive.Index do
         Catalog.search_products_paginated(
           search_query: search_query,
           sort_by: sort_by,
+          platform_filter: platform_filter,
           page: page,
           per_page: 20
         )
@@ -445,20 +505,23 @@ defmodule PavoiWeb.ProductsLive.Index do
   end
 
   defp apply_search_params(socket, params) do
-    # Read "q" param for search query and "sort" param for sorting
+    # Read "q" param for search query, "sort" param for sorting, and "platform" for filtering
     search_query = params["q"] || ""
     sort_by = params["sort"] || ""
+    platform_filter = params["platform"] || ""
 
-    # Reload products if search query OR sort changed OR if products haven't been loaded yet
+    # Reload products if search query OR sort OR platform changed OR if products haven't been loaded yet
     should_load =
       socket.assigns.product_search_query != search_query ||
         socket.assigns.product_sort_by != sort_by ||
+        socket.assigns.platform_filter != platform_filter ||
         socket.assigns.product_total_count == 0
 
     if should_load do
       socket
       |> assign(:product_search_query, search_query)
       |> assign(:product_sort_by, sort_by)
+      |> assign(:platform_filter, platform_filter)
       |> assign(:product_page, 1)
       |> assign(:loading_products, true)
       |> load_products_for_browse()
@@ -466,4 +529,8 @@ defmodule PavoiWeb.ProductsLive.Index do
       socket
     end
   end
+
+  # Helper to build query params, only including non-empty values
+  defp maybe_add_param(params, _key, ""), do: params
+  defp maybe_add_param(params, key, value), do: Map.put(params, key, value)
 end

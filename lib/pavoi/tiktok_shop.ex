@@ -148,69 +148,12 @@ defmodule Pavoi.TiktokShop do
 
   Automatically handles signature generation and token refresh if needed.
   """
-  def make_api_request(method, path, params \\ %{}, body \\ "") do
-    case get_auth() do
-      nil ->
-        {:error, :no_auth_record}
-
-      auth ->
-        # Check if token is expired and refresh if needed
-        auth = ensure_valid_token(auth)
-
-        timestamp = :os.system_time(:second)
-
-        # Build common parameters (WITHOUT access_token - it goes in header)
-        common_params = %{
-          app_key: app_key(),
-          timestamp: timestamp
-        }
-
-        # Add shop_cipher if available and not already in params
-        common_params =
-          if auth.shop_cipher && !Map.has_key?(params, :shop_cipher) do
-            Map.put(common_params, :shop_cipher, auth.shop_cipher)
-          else
-            common_params
-          end
-
-        # Merge with provided params
-        all_params = Map.merge(common_params, params)
-
-        # Generate signature
-        sign = generate_signature(path, all_params, body)
-        all_params = Map.put(all_params, :sign, sign)
-
-        # Build headers with access token
-        headers = [{"x-tts-access-token", auth.access_token}]
-
-        # Make the request
-        url = "#{api_base()}#{path}"
-
-        case method do
-          :get ->
-            case Req.get(url, params: all_params, headers: headers) do
-              {:ok, %Req.Response{status: 200, body: response_body}} ->
-                {:ok, response_body}
-
-              {:ok, %Req.Response{status: status, body: response_body}} ->
-                {:error, "HTTP #{status}: #{inspect(response_body)}"}
-
-              {:error, error} ->
-                {:error, "Request failed: #{inspect(error)}"}
-            end
-
-          :post ->
-            case Req.post(url, json: body, params: all_params, headers: headers) do
-              {:ok, %Req.Response{status: 200, body: response_body}} ->
-                {:ok, response_body}
-
-              {:ok, %Req.Response{status: status, body: response_body}} ->
-                {:error, "HTTP #{status}: #{inspect(response_body)}"}
-
-              {:error, error} ->
-                {:error, "Request failed: #{inspect(error)}"}
-            end
-        end
+  def make_api_request(method, path, params \\ %{}, body \\ %{}) do
+    with {:ok, auth} <- get_auth_or_error(),
+         auth <- ensure_valid_token(auth),
+         {all_params, body_string, headers} <- build_request_params(auth, path, params, body),
+         url <- "#{api_base()}#{path}" do
+      execute_request(method, url, all_params, body_string, headers)
     end
   end
 
@@ -240,8 +183,7 @@ defmodule Pavoi.TiktokShop do
     param_string =
       params
       |> Enum.sort_by(fn {k, _v} -> to_string(k) end)
-      |> Enum.map(fn {k, v} -> "#{k}#{v}" end)
-      |> Enum.join("")
+      |> Enum.map_join("", fn {k, v} -> "#{k}#{v}" end)
 
     # Build input string: secret + path + params + body + secret
     input = "#{app_secret()}#{path}#{param_string}#{body}#{app_secret()}"
@@ -252,6 +194,85 @@ defmodule Pavoi.TiktokShop do
   end
 
   ## Private Helper Functions
+
+  defp get_auth_or_error do
+    case get_auth() do
+      nil -> {:error, :no_auth_record}
+      auth -> {:ok, auth}
+    end
+  end
+
+  defp build_request_params(auth, path, params, body) do
+    timestamp = :os.system_time(:second)
+
+    # Build common parameters (WITHOUT access_token - it goes in header)
+    common_params = %{
+      app_key: app_key(),
+      timestamp: timestamp
+    }
+
+    # Add shop_cipher if available and not already in params
+    common_params =
+      if auth.shop_cipher && !Map.has_key?(params, :shop_cipher) do
+        Map.put(common_params, :shop_cipher, auth.shop_cipher)
+      else
+        common_params
+      end
+
+    # Merge with provided params
+    all_params = Map.merge(common_params, params)
+
+    # For signature, body needs to be JSON string
+    body_string = if body == %{} or body == "", do: "", else: Jason.encode!(body)
+
+    # Generate signature
+    sign = generate_signature(path, all_params, body_string)
+    all_params = Map.put(all_params, :sign, sign)
+
+    # Build headers with access token
+    headers = [{"x-tts-access-token", auth.access_token}]
+
+    {all_params, body_string, headers}
+  end
+
+  defp execute_request(:get, url, all_params, _body_string, headers) do
+    execute_get_request(url, all_params, headers)
+  end
+
+  defp execute_request(:post, url, all_params, body_string, headers) do
+    execute_post_request(url, all_params, body_string, headers)
+  end
+
+  defp execute_get_request(url, all_params, headers) do
+    url
+    |> Req.get(params: all_params, headers: headers)
+    |> handle_response()
+  end
+
+  defp execute_post_request(url, all_params, body_string, headers) do
+    # Add Content-Type header and send pre-encoded JSON body
+    post_headers = [{"Content-Type", "application/json"} | headers]
+
+    # Build URL with query parameters manually
+    query_string = URI.encode_query(all_params)
+    full_url = "#{url}?#{query_string}"
+
+    full_url
+    |> Req.post(body: body_string, headers: post_headers)
+    |> handle_response()
+  end
+
+  defp handle_response({:ok, %Req.Response{status: 200, body: response_body}}) do
+    {:ok, response_body}
+  end
+
+  defp handle_response({:ok, %Req.Response{status: status, body: response_body}}) do
+    {:error, "HTTP #{status}: #{inspect(response_body)}"}
+  end
+
+  defp handle_response({:error, error}) do
+    {:error, "Request failed: #{inspect(error)}"}
+  end
 
   defp generate_state do
     :crypto.strong_rand_bytes(16) |> Base.url_encode64(padding: false)
@@ -320,7 +341,8 @@ defmodule Pavoi.TiktokShop do
       # Token expired or expiring soon, refresh it
       case refresh_access_token() do
         {:ok, updated_auth} -> updated_auth
-        {:error, _} -> auth  # Return original if refresh fails
+        # Return original if refresh fails
+        {:error, _} -> auth
       end
     else
       auth

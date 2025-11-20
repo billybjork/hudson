@@ -43,6 +43,7 @@ defmodule Pavoi.Catalog.Product do
     field :sale_price_cents, :integer
     field :pid, :string
     field :sku, :string
+    field :tiktok_product_id, :string
 
     belongs_to :brand, Pavoi.Catalog.Brand
     has_many :product_images, Pavoi.Catalog.ProductImage, preload_order: [asc: :position]
@@ -63,7 +64,8 @@ defmodule Pavoi.Catalog.Product do
       :original_price_cents,
       :sale_price_cents,
       :pid,
-      :sku
+      :sku,
+      :tiktok_product_id
     ])
     |> validate_required([:brand_id, :name, :original_price_cents])
     |> validate_number(:original_price_cents, greater_than: 0)

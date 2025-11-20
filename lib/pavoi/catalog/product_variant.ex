@@ -17,6 +17,9 @@ defmodule Pavoi.Catalog.ProductVariant do
     field :barcode, :string
     field :position, :integer
     field :selected_options, :map
+    field :tiktok_sku_id, :string
+    field :tiktok_price_cents, :integer
+    field :tiktok_compare_at_price_cents, :integer
 
     belongs_to :product, Pavoi.Catalog.Product
 
@@ -35,12 +38,17 @@ defmodule Pavoi.Catalog.ProductVariant do
       :compare_at_price_cents,
       :barcode,
       :position,
-      :selected_options
+      :selected_options,
+      :tiktok_sku_id,
+      :tiktok_price_cents,
+      :tiktok_compare_at_price_cents
     ])
-    |> validate_required([:product_id, :shopify_variant_id, :title, :price_cents, :position])
+    |> validate_required([:product_id, :title, :price_cents, :position])
     |> validate_number(:price_cents, greater_than: 0)
     |> validate_compare_at_price()
+    |> validate_tiktok_compare_at_price()
     |> unique_constraint(:shopify_variant_id)
+    |> unique_constraint(:tiktok_sku_id)
     |> foreign_key_constraint(:product_id)
   end
 
@@ -49,6 +57,14 @@ defmodule Pavoi.Catalog.ProductVariant do
       nil -> changeset
       price when price > 0 -> changeset
       _ -> add_error(changeset, :compare_at_price_cents, "must be nil or greater than 0")
+    end
+  end
+
+  defp validate_tiktok_compare_at_price(changeset) do
+    case get_field(changeset, :tiktok_compare_at_price_cents) do
+      nil -> changeset
+      price when price > 0 -> changeset
+      _ -> add_error(changeset, :tiktok_compare_at_price_cents, "must be nil or greater than 0")
     end
   end
 

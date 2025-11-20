@@ -407,6 +407,8 @@ defmodule PavoiWeb.CoreComponents do
   attr :current_page, :atom, required: true
   attr :syncing, :boolean, default: false
   attr :last_sync_at, :any, default: nil
+  attr :tiktok_syncing, :boolean, default: false
+  attr :tiktok_last_sync_at, :any, default: nil
 
   def nav_tabs(assigns) do
     ~H"""
@@ -443,7 +445,7 @@ defmodule PavoiWeb.CoreComponents do
         <%= if @current_page == :products do %>
           <%= if @last_sync_at do %>
             <div class="navbar__sync-meta">
-              Last synced: {format_relative_time(@last_sync_at)}
+              Shopify synced: {format_relative_time(@last_sync_at)}
             </div>
           <% end %>
           <.button
@@ -453,7 +455,21 @@ defmodule PavoiWeb.CoreComponents do
             class={@syncing && "button--disabled"}
             disabled={@syncing}
           >
-            {if @syncing, do: "Syncing...", else: "Initiate Shopify Sync"}
+            {if @syncing, do: "Syncing Shopify...", else: "Sync Shopify"}
+          </.button>
+          <%= if @tiktok_last_sync_at do %>
+            <div class="navbar__sync-meta">
+              TikTok synced: {format_relative_time(@tiktok_last_sync_at)}
+            </div>
+          <% end %>
+          <.button
+            variant="primary"
+            size="sm"
+            phx-click="trigger_tiktok_sync"
+            class={@tiktok_syncing && "button--disabled"}
+            disabled={@tiktok_syncing}
+          >
+            {if @tiktok_syncing, do: "Syncing TikTok...", else: "Sync TikTok Shop"}
           </.button>
         <% end %>
         <.theme_toggle />

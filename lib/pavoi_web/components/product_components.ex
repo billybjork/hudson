@@ -257,10 +257,22 @@ defmodule PavoiWeb.ProductComponents do
             </div>
 
             <div style="color: var(--color-text-secondary); font-size: var(--text-sm);">
-              <strong style="font-weight: var(--font-semibold); color: var(--color-text-primary);">
-                Product ID:
-              </strong>
-              <span style="font-family: monospace;">{@editing_product.pid}</span>
+              <%= if @editing_product.pid do %>
+                <div style="margin-bottom: var(--space-2);">
+                  <strong style="font-weight: var(--font-semibold); color: var(--color-text-primary);">
+                    Shopify Product ID:
+                  </strong>
+                  <span style="font-family: monospace;">{@editing_product.pid}</span>
+                </div>
+              <% end %>
+              <%= if @editing_product.tiktok_product_id do %>
+                <div style="margin-bottom: var(--space-2);">
+                  <strong style="font-weight: var(--font-semibold); color: var(--color-text-primary);">
+                    TikTok Product ID:
+                  </strong>
+                  <span style="font-family: monospace;">{@editing_product.tiktok_product_id}</span>
+                </div>
+              <% end %>
             </div>
 
             <%= if @editing_product.sku do %>
@@ -430,6 +442,11 @@ defmodule PavoiWeb.ProductComponents do
   attr :show_sort, :boolean, default: false, doc: "Whether to show sort dropdown"
   attr :sort_by, :string, default: "", doc: "Current sort option"
   attr :on_sort_change, :string, default: nil, doc: "Event to trigger on sort change"
+  attr :platform_filter, :string, default: "", doc: "Current platform filter"
+
+  attr :on_platform_filter_change, :string,
+    default: nil,
+    doc: "Event to trigger on platform filter change"
 
   def product_grid(assigns) do
     ~H"""
@@ -448,6 +465,24 @@ defmodule PavoiWeb.ProductComponents do
                 placeholder={@search_placeholder}
               />
             </div>
+            <%= if @on_platform_filter_change do %>
+              <div class="product-grid__filter">
+                <form phx-change={@on_platform_filter_change}>
+                  <select
+                    id="platform-filter"
+                    name="platform"
+                    value={@platform_filter}
+                    class="input input--sm"
+                  >
+                    <option value="">All Products</option>
+                    <option value="shopify" selected={@platform_filter == "shopify"}>Shopify</option>
+                    <option value="tiktok" selected={@platform_filter == "tiktok"}>
+                      TikTok Shop
+                    </option>
+                  </select>
+                </form>
+              </div>
+            <% end %>
             <%= if @show_sort do %>
               <div class="product-grid__sort">
                 <form phx-change={@on_sort_change}>
@@ -487,12 +522,13 @@ defmodule PavoiWeb.ProductComponents do
           class="product-grid__grid"
           id={
             if @use_dynamic_id do
-              # Include both search and sort in ID to force re-render on changes
+              # Include search, sort, and platform filter in ID to force re-render on changes
               search_part =
                 if @search_query == "", do: "all", else: String.replace(@search_query, " ", "-")
 
               sort_part = if @sort_by == "", do: "default", else: @sort_by
-              "product-grid-#{search_part}-#{sort_part}"
+              platform_part = if @platform_filter == "", do: "all", else: @platform_filter
+              "product-grid-#{search_part}-#{sort_part}-#{platform_part}"
             else
               "product-grid"
             end

@@ -1,4 +1,10 @@
-<.nav_tabs current_page={@current_page} syncing={@syncing} last_sync_at={@last_sync_at} />
+<.nav_tabs
+  current_page={@current_page}
+  syncing={@syncing}
+  last_sync_at={@last_sync_at}
+  tiktok_syncing={@tiktok_syncing}
+  tiktok_last_sync_at={@tiktok_last_sync_at}
+/>
 
 <div class="products-index">
   <.product_grid
@@ -16,6 +22,8 @@
     show_sort={true}
     sort_by={@product_sort_by}
     on_sort_change="sort_changed"
+    platform_filter={@platform_filter}
+    on_platform_filter_change="platform_filter_changed"
     loading={@loading_products}
     is_empty={@product_total_count == 0}
     viewport_bottom={

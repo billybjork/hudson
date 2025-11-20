@@ -128,11 +128,12 @@ defmodule Pavoi.Catalog do
 
   ## Options
     - brand_id: Filter by brand ID
-    - search_query: Search by product name, SKU, or PID (default: "")
+    - search_query: Search by product name, SKU, PID, or TikTok product ID (default: "")
     - exclude_ids: List of product IDs to exclude from results (default: [])
     - page: Current page number (default: 1)
     - per_page: Items per page (default: 20)
     - sort_by: Sort order - "" or "name" (default), "price_asc", "price_desc"
+    - platform_filter: Filter by platform - "" (all), "shopify", "tiktok" (default: "")
 
   ## Returns
     A map with:
@@ -143,52 +144,20 @@ defmodule Pavoi.Catalog do
       - has_more: Boolean indicating if more products are available
   """
   def search_products_paginated(opts \\ []) do
-    brand_id = Keyword.get(opts, :brand_id)
-    search_query = Keyword.get(opts, :search_query, "")
-    exclude_ids = Keyword.get(opts, :exclude_ids, [])
     page = Keyword.get(opts, :page, 1)
     per_page = Keyword.get(opts, :per_page, 20)
     sort_by = Keyword.get(opts, :sort_by, "")
 
-    # Build base query
-    query = from(p in Product, preload: :product_images)
-
-    # Filter by brand if provided
+    # Build and filter query
     query =
-      if brand_id do
-        where(query, [p], p.brand_id == ^brand_id)
-      else
-        query
-      end
+      from(p in Product, preload: :product_images)
+      |> apply_brand_filter(Keyword.get(opts, :brand_id))
+      |> apply_platform_filter(Keyword.get(opts, :platform_filter, ""))
+      |> apply_search_filter(Keyword.get(opts, :search_query, ""))
+      |> apply_exclude_ids_filter(Keyword.get(opts, :exclude_ids, []))
 
-    # Apply search filter if query provided
-    query =
-      if search_query != "" do
-        search_pattern = "%#{search_query}%"
-
-        where(
-          query,
-          [p],
-          ilike(p.name, ^search_pattern) or
-            ilike(p.sku, ^search_pattern) or
-            ilike(p.pid, ^search_pattern)
-        )
-      else
-        query
-      end
-
-    # Exclude products if IDs provided
-    query =
-      if Enum.empty?(exclude_ids) do
-        query
-      else
-        where(query, [p], p.id not in ^exclude_ids)
-      end
-
-    # Get total count
+    # Get total count and paginated results
     total = Repo.aggregate(query, :count)
-
-    # Get paginated results with dynamic sorting
     order_by_clause = build_order_by(sort_by)
 
     products =
@@ -207,6 +176,36 @@ defmodule Pavoi.Catalog do
       has_more: total > page * per_page
     }
   end
+
+  defp apply_brand_filter(query, nil), do: query
+  defp apply_brand_filter(query, brand_id), do: where(query, [p], p.brand_id == ^brand_id)
+
+  defp apply_platform_filter(query, "shopify"), do: where(query, [p], not is_nil(p.pid))
+
+  defp apply_platform_filter(query, "tiktok"),
+    do: where(query, [p], not is_nil(p.tiktok_product_id))
+
+  defp apply_platform_filter(query, _), do: query
+
+  defp apply_search_filter(query, ""), do: query
+
+  defp apply_search_filter(query, search_query) do
+    search_pattern = "%#{search_query}%"
+
+    where(
+      query,
+      [p],
+      ilike(p.name, ^search_pattern) or
+        ilike(p.sku, ^search_pattern) or
+        ilike(p.pid, ^search_pattern) or
+        ilike(p.tiktok_product_id, ^search_pattern)
+    )
+  end
+
+  defp apply_exclude_ids_filter(query, []), do: query
+
+  defp apply_exclude_ids_filter(query, exclude_ids),
+    do: where(query, [p], p.id not in ^exclude_ids)
 
   defp add_primary_image_virtual_field(products) do
     Enum.map(products, fn product ->
