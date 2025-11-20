@@ -28,6 +28,20 @@ defmodule PavoiWeb.Router do
     get "/logout", AuthController, :logout
   end
 
+  # TikTok Shop OAuth routes (not protected to allow callbacks)
+  scope "/tiktok", PavoiWeb do
+    pipe_through :browser
+
+    get "/callback", TiktokShopController, :callback
+  end
+
+  # TikTok Shop API test route
+  scope "/api/tiktok", PavoiWeb do
+    pipe_through :api
+
+    get "/test", TiktokShopController, :test
+  end
+
   # Main application routes (protected in production)
   scope "/", PavoiWeb do
     pipe_through [:browser, :protected]
