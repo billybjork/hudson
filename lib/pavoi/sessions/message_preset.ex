@@ -14,7 +14,6 @@ defmodule Pavoi.Sessions.MessagePreset do
   @valid_colors ~w(amber blue green red purple gray)
 
   schema "message_presets" do
-    field :label, :string
     field :message_text, :string
     field :color, :string
     field :position, :integer
@@ -30,9 +29,8 @@ defmodule Pavoi.Sessions.MessagePreset do
   @doc false
   def changeset(message_preset, attrs) do
     message_preset
-    |> cast(attrs, [:label, :message_text, :color, :position])
-    |> validate_required([:label, :message_text, :color])
-    |> validate_length(:label, min: 1, max: 100)
+    |> cast(attrs, [:message_text, :color, :position])
+    |> validate_required([:message_text, :color])
     |> validate_length(:message_text, min: 1, max: 1000)
     |> validate_inclusion(:color, @valid_colors)
     |> validate_number(:position, greater_than_or_equal_to: 0)

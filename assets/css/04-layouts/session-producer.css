@@ -773,27 +773,13 @@
 .preset-item__color--purple { background-color: var(--color-accent-purple); }
 .preset-item__color--gray { background-color: var(--color-text-secondary); }
 
-.preset-item__content {
+.preset-item__text {
   flex: 1;
   min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-}
-
-.preset-item__label {
   font-size: var(--text-base);
-  font-weight: var(--font-semibold);
+  font-weight: var(--font-medium);
   color: var(--color-text-primary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.preset-item__text {
-  font-size: var(--text-sm);
-  font-weight: var(--font-normal);
-  color: var(--color-text-secondary);
+  text-align: left;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

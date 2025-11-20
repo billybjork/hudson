@@ -198,10 +198,7 @@
                     phx-value-id={preset.id}
                   >
                     <div class={"preset-item__color preset-item__color--#{preset.color}"}></div>
-                    <div class="preset-item__content">
-                      <div class="preset-item__label">{preset.label}</div>
-                      <div class="preset-item__text">{preset.message_text}</div>
-                    </div>
+                    <div class="preset-item__text">{preset.message_text}</div>
                   </button>
                   <button
                     type="button"
@@ -221,18 +218,6 @@
           <div class="preset-create">
             <h3>Create New Preset</h3>
             <form phx-submit="create_preset">
-              <div class="form-field">
-                <label for="preset-label">Label</label>
-                <input
-                  type="text"
-                  id="preset-label"
-                  name="label"
-                  placeholder="e.g., Break Time, Great Job"
-                  required
-                  maxlength="100"
-                />
-              </div>
-
               <div class="form-field">
                 <label for="preset-message">Message</label>
                 <textarea
